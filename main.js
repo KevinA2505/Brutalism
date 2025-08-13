@@ -1,82 +1,18 @@
-(() => {
-  const canvas = document.getElementById('threeCanvas');
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.shadowMap.enabled = true;
+import { initCamera } from './camera.js';
+import { initAI, setupMatch, decideAndMove, updateTeamCounts } from './ai.js';
 
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0f141b);
+const canvas = document.getElementById('threeCanvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
 
-  // Cámara satelital con inercia
-  const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 6000);
-  const SATELLITE = { r: 66, phi: 0.62 };
-  camera.position.set(0, 38, 56);
-  const controls = {
-    satellite: true,
-    target: new THREE.Vector3(0, 1, 0),
-    spherical: { r: SATELLITE.r, phi: SATELLITE.phi, theta: 0 },
-    dragging: false, button: 0, lastX: 0, lastY: 0,
-    panX: 0, panY: 0, rotVelTheta: 0, rotVelPhi: 0,
-    inertia: 0.92, sensitivity: 0.006,
-    zoom(delta){
-      const minR = this.satellite ? 32 : 10;
-      const maxR = this.satellite ? 130 : 130;
-      this.spherical.r = Math.min(maxR, Math.max(minR, this.spherical.r * (delta>0 ? 1.1: 0.9)));
-    },
-    rotate(dx, dy, speedMul, boost){
-      const sens = this.sensitivity * (boost ? 1.9 : 1.0);
-      this.rotVelTheta -= dx * sens;
-      this.rotVelPhi   -= dy * sens * 0.85;
-      this.spherical.theta += this.rotVelTheta * speedMul;
-      this.spherical.phi   += this.rotVelPhi   * speedMul;
-      const minPhi = 0.38, maxPhi = 1.2;
-      this.spherical.phi = Math.min(maxPhi, Math.max(minPhi, this.spherical.phi));
-    },
-    pan(dx, dy){
-      const panSpeed = 0.014 * this.spherical.r;
-      this.panX += -dx * panSpeed;
-      this.panY +=  dy * panSpeed;
-    },
-    update(){
-      if (this.satellite) this.spherical.theta += 0.0015 * speedMul;
-      else if (!this.dragging){
-        this.spherical.theta += this.rotVelTheta;
-        this.spherical.phi   += this.rotVelPhi;
-        this.rotVelTheta *= this.inertia;
-        this.rotVelPhi   *= this.inertia * 0.96;
-      }
-      const r = this.spherical.r;
-      const x = r * Math.sin(this.spherical.phi) * Math.sin(this.spherical.theta);
-      const y = r * Math.cos(this.spherical.phi);
-      const z = r * Math.sin(this.spherical.phi) * Math.cos(this.spherical.theta);
-      const targetPos = new THREE.Vector3(x + this.panX, y + this.panY + 1, z);
-      camera.position.lerp(targetPos, 0.2);
-      camera.lookAt(this.target.x + this.panX, this.target.y + this.panY, this.target.z);
-    }
-  };
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0f141b);
 
-  // Interacción (sólo canvas)
-  window.addEventListener('resize', onResize);
-  window.addEventListener('wheel', (e) => { e.preventDefault(); controls.zoom(e.deltaY); }, { passive: false });
-  window.addEventListener('mousedown', (e) => {
-    const overUI = !!e.target.closest('.panel'); if (overUI) return;
-    controls.dragging = true; controls.button = e.button;
-    controls.lastX = e.clientX; controls.lastY = e.clientY;
-    if (e.target === canvas){ canvas.requestPointerLock && canvas.requestPointerLock(); }
-  });
-  window.addEventListener('mouseup', () => { controls.dragging = false; document.exitPointerLock && document.exitPointerLock(); });
-  window.addEventListener('mousemove', (e) => {
-    if (!controls.dragging) return;
-    let dx = e.movementX ?? (e.clientX - controls.lastX);
-    let dy = e.movementY ?? (e.clientY - controls.lastY);
-    controls.lastX = e.clientX; controls.lastY = e.clientY;
-    if (controls.button === 0) controls.rotate(dx, dy, 1.0, e.shiftKey);
-    if (controls.button === 2) controls.pan(dx, dy);
-  });
-  window.addEventListener('contextmenu', (e) => e.preventDefault());
+const simState = { active: false, paused: false, speedMul: 1.0 };
 
-  function onResize(){ camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); }
+const { camera, controls } = initCamera(renderer, canvas, simState);
 
   // Luces
   scene.add(new THREE.AmbientLight(0x446688, 0.38));
@@ -358,8 +294,7 @@
     rough: document.getElementById('rough'),
     mtn: document.getElementById('mtn'),
   };
-  let active = false, paused = false, speedMul = 1.0;
-  ui.speed.addEventListener('input', () => { speedMul = parseFloat(ui.speed.value); ui.speedLbl.textContent = speedMul.toFixed(2) + "x"; });
+  ui.speed.addEventListener('input', () => { simState.speedMul = parseFloat(ui.speed.value); ui.speedLbl.textContent = simState.speedMul.toFixed(2) + "x"; });
   ui.satellite.addEventListener('change', () => { controls.satellite = ui.satellite.checked; });
   controls.satellite = ui.satellite.checked;
   ui.teamsCount.addEventListener('input', ()=>{ ui.teamsLbl.textContent = ui.teamsCount.value; setupMatch(); });
@@ -367,13 +302,13 @@
   function log(text){ const d = new Date().toLocaleTimeString(); ui.log.insertAdjacentHTML('beforeend', `<div>[${d}] ${text}</div>`); ui.log.scrollTop = ui.log.scrollHeight; }
 
   ui.start.addEventListener('click', () => {
-    if (active) return;
-    active = true; paused = false;
+    if (simState.active) return;
+    simState.active = true; simState.paused = false;
     allUnits.forEach(u => { u.userData.attackT = 0; u.userData.healT = 0; u.userData.isAttacking = false; u.userData.state=""; u.userData.stateT=0; });
     ui.start.disabled = true; ui.pause.disabled = false;
     ui.status.textContent = "¡Batalla en curso!"; log("¡La batalla ha comenzado!");
   });
-  ui.pause.addEventListener('click', () => { if (!active) return; paused = !paused; ui.pause.textContent = paused ? "Reanudar" : "Pausar"; ui.status.textContent = paused ? "Batalla pausada" : "¡Batalla en curso!"; });
+  ui.pause.addEventListener('click', () => { if (!simState.active) return; simState.paused = !simState.paused; ui.pause.textContent = simState.paused ? "Reanudar" : "Pausar"; ui.status.textContent = simState.paused ? "Batalla pausada" : "¡Batalla en curso!"; });
   ui.reset.addEventListener('click', setupMatch);
 
   // ======= Salud y efectos =======
@@ -644,7 +579,7 @@
     // comprobar victoria: cuántos equipos con vivos > 0
     const aliveTeams = teams.filter(t => t.units.some(u=>u.userData.alive));
     if (aliveTeams.length <= 1){
-      active = false; ui.start.disabled = false; ui.pause.disabled = true;
+      simState.active = false; ui.start.disabled = false; ui.pause.disabled = true;
       const winner = aliveTeams[0];
       ui.status.textContent = winner ? `¡Gana ${winner.name}!` : "Empate";
     }
@@ -704,184 +639,32 @@
     }
   }
 
-  function updateTeamCounts(){
-    // construir UI dinámica
-    const box = ui.teamsPanel;
-    box.innerHTML = "";
-    for (let i=0;i<teams.length;i++){
-      const t = teams[i];
-      const total = t.units.length;
-      const alive = t.units.filter(u=>u.userData.alive).length;
-      const row = document.createElement('div'); row.className = 'teamRow';
-      row.innerHTML = `
-        <span class="dot" style="background:#${t.color.toString(16).padStart(6,'0')}"></span>
-        <strong style="min-width:84px">${t.name}</strong>
-        <div class="bar" style="flex:1"><div class="fill" style="width:${(100*alive/total).toFixed(1)}%"></div></div>
-        <span style="width:64px; text-align:right">${alive}/${total}</span>`;
-      box.appendChild(row);
-    }
-  }
 
-  function setupMatch(){
-    active = false; paused = false; ui.start.disabled = false; ui.pause.disabled = true; ui.pause.textContent = "Pausar"; ui.status.textContent = "Preparado.";
-    clearUnits();
-    buildTeams(parseInt(ui.teamsCount.value||2));
-    allUnits.forEach(updateHPBar); updateTeamCounts();
-  }
-  setupMatch();
+initAI({
+  THREE,
+  simState,
+  ui,
+  teams,
+  allUnits,
+  clearUnits,
+  buildTeams,
+  updateHPBar,
+  enemiesOf,
+  alliesOf,
+  blockedLOS,
+  avoidObstacles,
+  spawnProjectile,
+  applyDamage,
+  triggerShake,
+  ground,
+  crowdRepel,
+  lookAt2D,
+  clamp,
+  ARENA_R,
+  tmpV,
+});
 
-  // ======= IA: utilidad con huida, mantenimiento de rango y LOS =======
-  function selectTarget(u){
-    const enemies = enemiesOf(u);
-    if (enemies.length === 0) return null;
-    let best = enemies[0], bestScore = Infinity;
-    for (let i=0;i<enemies.length;i++){
-      const e = enemies[i];
-      const d = e.position.distanceTo(u.position);
-      const losBlocked = blockedLOS(u.position, e.position) ? 1.25 : 1.0;
-      const s = d * losBlocked * (1.0 + (e.userData.health/e.userData.maxHealth)*0.4);
-      if (s < bestScore){ best = e; bestScore = s; }
-    }
-    return best;
-  }
-  function lowestAlly(u){
-    const allies = alliesOf(u).filter(a=>a.userData.alive);
-    if (allies.length===0) return null;
-    let best = null, bestRatio = 1e9;
-    for (let i=0;i<allies.length;i++){
-      const a = allies[i]; const r = a.userData.health / a.userData.maxHealth;
-      if (r < bestRatio){ best = a; bestRatio = r; }
-    }
-    return { ally: best, ratio: bestRatio };
-  }
-
-  function decideAndMove(u, dt){
-    if (!u.userData.alive) return;
-    u.userData.stateT -= dt;
-    if (u.userData.stateT < 0 && u.userData.state === "flee") u.userData.state = "";
-
-    // seleccionar objetivos periódicamente
-    u.userData.retargetT -= dt;
-    if (u.userData.retargetT <= 0 || !u.userData.target || !u.userData.target.userData.alive){
-      u.userData.target = selectTarget(u);
-      u.userData.retargetT = 0.5 + Math.random()*0.5;
-    }
-    const target = u.userData.target;
-
-    const hpRatio = u.userData.health / u.userData.maxHealth;
-    const nearbyEnemies = enemiesOf(u).filter(e => e.userData.alive && e.position.distanceTo(u.position) < 4.8);
-    const nearbyAllies = alliesOf(u).filter(a => a.userData.alive && a.position.distanceTo(u.position) < 4.8);
-    let desire = new THREE.Vector3(0,0,0);
-
-    // Estado de huida: por vida baja o desventaja numérica
-    const outnumbered = (nearbyEnemies.length - nearbyAllies.length) >= 2;
-    if ((hpRatio < 0.18) || (hpRatio < 0.4 && outnumbered)){
-      u.userData.state = "flee"; u.userData.stateT = 2.5 + Math.random()*1.5;
-    }
-    if (u.userData.state === "flee"){
-      if (nearbyEnemies.length){
-        let ex=0, ez=0; nearbyEnemies.forEach(e=>{ ex+=e.position.x; ez+=e.position.z; });
-        ex/=nearbyEnemies.length; ez/=nearbyEnemies.length;
-        const away = new THREE.Vector3(u.position.x - ex, 0, u.position.z - ez).normalize();
-        desire.add(away.multiplyScalar(1.2)).add(new THREE.Vector3(-away.z,0,away.x).multiplyScalar(0.4*(Math.random()<0.5?1:-1)));
-      } else {
-        const sign = Math.sign(u.userData.teamRef.units.reduce((s,x)=>s+x.position.x,0) || 1);
-        desire.add(new THREE.Vector3(sign,0,0));
-      }
-    }
-
-    if (target){
-      tmpV.copy(target.position).sub(u.position); const dist = tmpV.length(); tmpV.normalize();
-      if (blockedLOS(u.position, target.position)){
-        desire.add(new THREE.Vector3(-tmpV.z,0,tmpV.x).multiplyScalar(0.8*(Math.random()<0.5?1:-1)));
-      }
-      lookAt2D(u, tmpV);
-
-      const R = u.userData.attackRange;
-      const ranged = (u.userData.type==="arquero"||u.userData.type==="mago");
-      const supporter = (u.userData.type==="sanador");
-      const inRangeMelee = (!ranged && !supporter) && dist <= R+0.08;
-      const inRangeRanged = (ranged) && dist <= R && dist >= 0.8;
-
-      if (ranged || supporter){
-        const keep = u.userData.keep || (supporter?7.0:6.2);
-        const err = dist - keep;
-        if (Math.abs(err) > 0.4){
-          desire.add(tmpV.clone().multiplyScalar(err>0 ? 0.9 : -1.0));
-        }
-        desire.add(new THREE.Vector3(-tmpV.z,0,tmpV.x).multiplyScalar(0.4*(Math.random()<0.5?1:-1)));
-      }
-
-      if (supporter){
-        const danger = enemiesOf(u).some(e => e.position.distanceTo(u.position) < 4.5);
-        const low = lowestAlly(u);
-        if (danger){
-          const nearest = enemiesOf(u).reduce((a,b)=> (a.position.distanceTo(u.position) < b.position.distanceTo(u.position))?a:b);
-          const away = u.position.clone().sub(nearest.position).normalize();
-          desire.add(away.multiplyScalar(1.1));
-        }
-        if (low && low.ratio < 0.95){
-          const ally = low.ally; const d = ally.position.distanceTo(u.position);
-          if (d <= u.userData.healRange && u.userData.healT <= 0){ spawnProjectile(u, ally, "cura"); u.userData.healT = u.userData.healCd; }
-          else { desire.add(ally.position.clone().sub(u.position).normalize().multiplyScalar(0.6)); }
-        }
-      }
-
-      if (!ranged && !supporter && u.userData.state !== "flee"){
-        const flankBias = (u.userData.type==="picaro") ? 0.9 : 0.35;
-        const flank = new THREE.Vector3(-tmpV.z,0,tmpV.x).multiplyScalar(flankBias*(Math.random()<0.5?1:-1));
-        if (!inRangeMelee) desire.add(tmpV).add(flank);
-      }
-
-      u.userData.attackT -= dt * speedMul; u.userData.healT -= dt * speedMul;
-      if (u.userData.attackT <= 0 && (inRangeMelee || inRangeRanged) && !u.userData.isAttacking){
-        u.userData.attackT = u.userData.attackCooldown; u.userData.isAttacking = true; u.userData.attackAnim = 0; u.userData.hitApplied = false;
-        if (u.userData.type === "arquero"){ setTimeout(() => { if (u.userData.alive && target.userData.alive) spawnProjectile(u, target, "flecha"); }, 140); }
-        if (u.userData.type === "mago"){ setTimeout(() => { if (u.userData.alive && target.userData.alive) spawnProjectile(u, target, "bola"); }, 220); }
-      }
-      if (u.userData.isAttacking){
-        u.userData.attackAnim += dt * (1.0 / 0.28) * speedMul; const tt = clamp(u.userData.attackAnim, 0, 1); const swing = Math.sin(tt * Math.PI);
-        if (ranged || supporter){ u.userData.rightPivot.rotation.z = -swing * 0.5; u.userData.trail.material.opacity = 0; }
-        else { u.userData.rightPivot.rotation.z = -swing * (u.userData.type==="tanque" ? 0.9 : 1.2); u.userData.rightPivot.rotation.x = swing * 0.25; u.userData.trail.material.opacity = (ui.showTrails.checked ? swing*0.7 : 0); }
-        if (!u.userData.hitApplied && tt > 0.42 && inRangeMelee){
-          u.userData.hitApplied = true;
-          let dmg = Math.floor(THREE.MathUtils.lerp(u.userData.damageMin, u.userData.damageMax, Math.random()));
-          if (u.userData.type === "tanque" && u.userData.aoe){
-            enemiesOf(u).forEach(e => { if (e.userData.alive && e.position.distanceTo(target.position) <= u.userData.aoe + 0.3){ applyDamage(e, dmg, e.position.clone().setY(1.1)); } });
-            triggerShake(0.22, 0.12);
-          } else {
-            if (u.userData.type === "picaro"){
-              const forward = new THREE.Vector3(Math.sin(target.rotation.y), 0, Math.cos(target.rotation.y));
-              const toAtt = u.position.clone().sub(target.position).normalize();
-              if (forward.dot(toAtt) > 0.5) dmg = Math.floor(dmg * u.userData.critBack);
-            }
-            applyDamage(target, dmg, target.position.clone().setY(1.1)); triggerShake(0.16, 0.08);
-          }
-        }
-        if (tt >= 1){ u.userData.isAttacking = false; u.userData.trail.material.opacity = 0; u.userData.rightPivot.rotation.set(0,0,0); }
-      }
-    }
-
-    desire.add(avoidObstacles(u.position));
-    if (desire.lengthSq() > 0.0001){
-      desire.normalize();
-      u.position.addScaledVector(desire, u.userData.speed * dt * speedMul);
-      ground(u);
-      u.userData.bobT += dt * 9 * speedMul;
-      const a = Math.sin(u.userData.bobT) * 0.45, b = Math.cos(u.userData.bobT) * 0.45;
-      u.userData.leftPivot.rotation.x  = a * 0.25;
-      u.userData.rightPivot.rotation.x = b * 0.25;
-    } else {
-      u.userData.leftPivot.rotation.x *= 0.8; u.userData.rightPivot.rotation.x *= 0.8;
-    }
-    crowdRepel(u, dt);
-
-    const r = Math.hypot(u.position.x, u.position.z);
-    if (r > ARENA_R-1.0){
-      const pull = (r - (ARENA_R-1.0)); u.position.addScaledVector(u.position.clone().multiplyScalar(-1/r), pull*0.7);
-      ground(u);
-    }
-  }
+setupMatch();
 
   // ======= Bucle =======
   function updateCameraTarget(dt){
@@ -897,13 +680,13 @@
   function frame(){
     requestAnimationFrame(frame);
     const now = performance.now();
-    let dt = Math.min(0.05, (now - last) / 1000); last = now;
-    if (paused) dt = 0;
+      let dt = Math.min(0.05, (now - last) / 1000); last = now;
+      if (simState.paused) dt = 0;
 
-    if (active && !paused){
-      for (let i=0;i<allUnits.length;i++) decideAndMove(allUnits[i], dt);
-      updateProjectiles(dt);
-    }
+      if (simState.active && !simState.paused){
+        for (let i=0;i<allUnits.length;i++) decideAndMove(allUnits[i], dt);
+        updateProjectiles(dt);
+      }
     allUnits.forEach(ground);
     updateCameraTarget(dt); controls.update();
     allUnits.forEach(u => { u.userData && u.userData.hpNode && u.userData.hpNode.lookAt(camera.position); });
@@ -915,4 +698,3 @@
   // ==== Exponer debug ====
   window.debug = { obstacles, terrain, teams };
 
-})();
