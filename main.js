@@ -23,6 +23,8 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
   const ARENA_R = 36;
   const terrain = makeTerrain(260, 260, 240, 240);
   scene.add(terrain.mesh);
+  export const heightAtWorld = (x, z) => terrain.heightAtWorld(x, z);
+  export const slopeAt = (x, z) => terrain.slopeAt(x, z);
 
   // Anillo de referencia (límite jugable)
   {
@@ -59,6 +61,28 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
       const x2 = (1-u)*grad(ab, xf,   yf-1) + u*grad(bb, xf-1, yf-1);
       return (1-v)*x1 + v*x2;
     };
+    this.fbm = function(nx, ny, oct=5, lac=2.0, gain=0.5){
+      let amp=1, freq=1, sum=0, norm=0;
+      for (let i=0;i<oct;i++){
+        sum += amp * this.perlin2(nx*freq, ny*freq);
+        norm += amp; amp*=gain; freq*=lac;
+      }
+      return sum/norm;
+    };
+    this.ridged = function(nx, ny, oct=4, lac=2.0, gain=0.5){
+      let amp=1, freq=1, sum=0, norm=0;
+      for (let i=0;i<oct;i++){
+        const n = this.perlin2(nx*freq, ny*freq);
+        sum += amp * (1 - Math.abs(n));
+        norm += amp; amp*=gain; freq*=lac;
+      }
+      return sum/norm;
+    };
+    this.domainWarp = function(x,y, amt=0.25){
+      const qx = this.fbm(x+5.2, y+1.3, 3, 2.0, 0.5);
+      const qy = this.fbm(x-2.8, y-3.1, 3, 2.0, 0.5);
+      return [x + amt*qx, y + amt*qy];
+    };
   }
 
   function makeTerrain(width, depth, segX, segZ){
@@ -73,37 +97,14 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
     let roughness = parseFloat(roughSlider.value || 1.8);
     let mountaininess = parseFloat(mtnSlider.value || 0.55);
 
-    function fbm(nx, ny, oct=5, lac=2.0, gain=0.5){
-      let amp=1, freq=1, sum=0, norm=0;
-      for (let i=0;i<oct;i++){
-        sum += amp * noise.perlin2(nx*freq, ny*freq);
-        norm += amp; amp*=gain; freq*=lac;
-      }
-      return sum/norm;
-    }
-    function ridged(nx,ny, oct=4, lac=2.0, gain=0.5){
-      let amp=1, freq=1, sum=0, norm=0;
-      for (let i=0;i<oct;i++){
-        const n = noise.perlin2(nx*freq, ny*freq);
-        sum += amp * (1 - Math.abs(n));
-        norm += amp; amp*=gain; freq*=lac;
-      }
-      return sum/norm;
-    }
-    function domainWarp(x,y, amt=0.25){
-      const qx = fbm(x+5.2, y+1.3, 3, 2.0, 0.5);
-      const qy = fbm(x-2.8, y-3.1, 3, 2.0, 0.5);
-      return [x + amt*qx, y + amt*qy];
-    }
     function heightAtXZ(x, z){
       const nx = (x/width + 0.5) * 2 - 1;
       const nz = (z/depth + 0.5) * 2 - 1;
-      const [wx, wz] = domainWarp(nx*0.9, nz*0.9, 0.35);
-      const biome = fbm(wx*0.6, wz*0.6, 3, 2.0, 0.5)*0.5 + 0.5;
+      const [wx, wz] = noise.domainWarp(nx*0.9, nz*0.9, 0.35);
+      const biome = noise.fbm(wx*0.6, wz*0.6, 3, 2.0, 0.5)*0.5 + 0.5;
       const mountainMask = Math.pow(THREE.MathUtils.clamp(biome, 0, 1), 1.2);
-      const base = fbm(nx*1.2, nz*1.2, 4, 2.1, 0.55) * 0.6;
-      const rnx = nx*1.4, rnz = nz*1.4;
-      const ridge = ridged(rnx, rnz, 5, 2.05, 0.47) * 2.3;
+      const base = noise.fbm(nx*1.2, nz*1.2, 4, 2.1, 0.55) * 0.6;
+      const ridge = noise.ridged(nx*1.4, nz*1.4, 5, 2.05, 0.47) * 2.3;
       const m = THREE.MathUtils.clamp(mountaininess, 0.2, 0.85);
       const h = THREE.MathUtils.lerp(base, ridge, mountainMask * m);
       const r = Math.sqrt(nx*nx + nz*nz);
