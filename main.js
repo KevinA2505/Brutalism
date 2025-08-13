@@ -91,6 +91,8 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
     geo.rotateX(-Math.PI/2);
     const pos = geo.attributes.position;
     const colors = new Float32Array((segX+1)*(segZ+1)*3);
+    const colorAttr = new THREE.BufferAttribute(colors, 3);
+    geo.setAttribute('color', colorAttr);
 
     const roughSlider = document.getElementById('rough');
     const mtnSlider = document.getElementById('mtn');
@@ -126,8 +128,8 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
         else { colors[cIdx+0]=0.30; colors[cIdx+1]=0.35; colors[cIdx+2]=0.38; }
       }
       pos.needsUpdate = true;
+      colorAttr.needsUpdate = true;
       geo.computeVertexNormals();
-      geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     }
     recolor();
     const mat = new THREE.MeshStandardMaterial({ vertexColors: true, metalness:.12, roughness:.96 });
