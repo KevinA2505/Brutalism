@@ -295,7 +295,7 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
     return tmpV.clone();
   }
   function crowdRepel(u, dt){
-    const allies = alliesOf(u);
+    const allies = alliesOf(u, 1.2);
     tmpV.set(0,0,0);
     for (let i=0;i<allies.length;i++){
       const a = allies[i]; if (a===u || !a.userData.alive) continue;
@@ -690,18 +690,26 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
         } else if (p.kind === "pocion"){
           const base = Math.floor(THREE.MathUtils.lerp(p.owner.userData.damageMin, p.owner.userData.damageMax, Math.random()));
           if (p.subtype === "cura"){
-            alliesOf(p.owner).forEach(a => { if (a.userData.alive && a.position.distanceTo(p.obj.position) <= 1.6){ const heal = Math.floor(THREE.MathUtils.lerp(p.owner.userData.healMin, p.owner.userData.healMax, Math.random())); applyHeal(a, heal, p.obj.position); } });
+            alliesOf(p.owner, 1.6, p.obj.position).forEach(a => {
+              const heal = Math.floor(THREE.MathUtils.lerp(p.owner.userData.healMin, p.owner.userData.healMax, Math.random()));
+              applyHeal(a, heal, p.obj.position);
+            });
           } else if (p.subtype === "fuego"){
-            enemiesOf(p.owner).forEach(e => { if (e.userData.alive && e.position.distanceTo(p.obj.position) <= 1.6){ applyDamage(e, base, p.obj.position); } });
+            enemiesOf(p.owner, 1.6, p.obj.position).forEach(e => { applyDamage(e, base, p.obj.position); });
             triggerShake(0.18, 0.1);
           } else {
-            enemiesOf(p.owner).forEach(e => { if (e.userData.alive && e.position.distanceTo(p.obj.position) <= 1.2){ applyDamage(e, Math.floor(base*0.7), p.obj.position); for (let t=1;t<=2;t++){ setTimeout(()=>{ if(e.userData.alive) applyDamage(e, Math.floor(base*0.4), e.position.clone().setY(1.1)); }, t*700); } } });
+            enemiesOf(p.owner, 1.2, p.obj.position).forEach(e => {
+              applyDamage(e, Math.floor(base*0.7), p.obj.position);
+              for (let t=1;t<=2;t++){
+                setTimeout(()=>{ if(e.userData.alive) applyDamage(e, Math.floor(base*0.4), e.position.clone().setY(1.1)); }, t*700);
+              }
+            });
           }
         } else {
           const dmg = Math.floor(THREE.MathUtils.lerp(p.owner.userData.damageMin, p.owner.userData.damageMax, Math.random()));
           applyDamage(p.target, dmg, p.obj.position);
           if (p.kind === "bola"){
-            enemiesOf(p.owner).forEach(e => { if (e.userData.alive && e !== p.target && e.position.distanceTo(p.obj.position) <= (p.owner.userData.splash || 1.3)){ applyDamage(e, Math.floor(dmg*0.75), p.obj.position); } });
+            enemiesOf(p.owner, (p.owner.userData.splash || 1.3), p.obj.position).forEach(e => { if (e !== p.target){ applyDamage(e, Math.floor(dmg*0.75), p.obj.position); } });
             triggerShake(0.2, 0.12);
           } else if (p.kind === "jabalina"){
             const t = p.target.userData;
@@ -724,16 +732,65 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
   ];
   let teams = []; // { id, name, color, units:[] }
   let allUnits = [];
+  const GRID_SIZE = 6;
+  const unitIndex = new Map();
 
-  function enemiesOf(u){
+  function keyFor(x, z){ return `${Math.floor(x/GRID_SIZE)},${Math.floor(z/GRID_SIZE)}`; }
+  function addToIndex(u){
+    const k = keyFor(u.position.x, u.position.z);
+    u.userData.idxKey = k;
+    let cell = unitIndex.get(k); if (!cell){ cell = new Set(); unitIndex.set(k, cell); }
+    cell.add(u);
+  }
+  function updateIndex(u){
+    const k = keyFor(u.position.x, u.position.z);
+    if (k === u.userData.idxKey) return;
+    if (u.userData.idxKey){
+      const old = unitIndex.get(u.userData.idxKey); old && old.delete(u);
+    }
+    let cell = unitIndex.get(k); if (!cell){ cell = new Set(); unitIndex.set(k, cell); }
+    cell.add(u); u.userData.idxKey = k;
+  }
+  function removeFromIndex(u){
+    const k = u.userData.idxKey; if (!k) return;
+    const cell = unitIndex.get(k); cell && cell.delete(u); u.userData.idxKey = null;
+  }
+  function queryIndex(pos, r){
     const res = [];
-    for (let i=0;i<teams.length;i++){
-      const t = teams[i]; if (t === u.userData.teamRef) continue;
-      for (let j=0;j<t.units.length;j++){ const e = t.units[j]; if (e.userData.alive) res.push(e); }
+    const minX = Math.floor((pos.x - r)/GRID_SIZE);
+    const maxX = Math.floor((pos.x + r)/GRID_SIZE);
+    const minZ = Math.floor((pos.z - r)/GRID_SIZE);
+    const maxZ = Math.floor((pos.z + r)/GRID_SIZE);
+    for (let x=minX; x<=maxX; x++){
+      for (let z=minZ; z<=maxZ; z++){
+        const cell = unitIndex.get(`${x},${z}`); if (!cell) continue;
+        cell.forEach(u => { if (u.userData.alive && u.position.distanceTo(pos) <= r) res.push(u); });
+      }
     }
     return res;
   }
-  function alliesOf(u){ return u.userData.teamRef.units; }
+  function allFromIndex(){
+    const res = [];
+    unitIndex.forEach(cell => cell.forEach(u => { if (u.userData.alive) res.push(u); }));
+    return res;
+  }
+
+  function enemiesOf(u, r=null, pos=u.position){
+    const list = r==null ? allFromIndex() : queryIndex(pos, r);
+    const res = [];
+    for (let i=0;i<list.length;i++){
+      const e = list[i]; if (e.userData.teamRef !== u.userData.teamRef) res.push(e);
+    }
+    return res;
+  }
+  function alliesOf(u, r=null, pos=u.position){
+    const list = r==null ? allFromIndex() : queryIndex(pos, r);
+    const res = [];
+    for (let i=0;i<list.length;i++){
+      const a = list[i]; if (a.userData.teamRef === u.userData.teamRef) res.push(a);
+    }
+    return res;
+  }
 
   function updateHPBar(u){
     const pct = clamp(u.userData.health / u.userData.maxHealth, 0, 1);
@@ -754,6 +811,7 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
   }
 
   function onDeath(unit){
+    removeFromIndex(unit);
     updateTeamCounts();
     // comprobar victoria: cuántos equipos con vivos > 0
     const aliveTeams = teams.filter(t => t.units.some(u=>u.userData.alive));
@@ -765,7 +823,7 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
     }
   }
 
-  function clearUnits(){ teams.forEach(t => t.units.forEach(u => scene.remove(u))); teams.forEach(t => t.units.length=0); allUnits = []; projectiles.splice(0).forEach(p => scene.remove(p.obj)); }
+  function clearUnits(){ teams.forEach(t => t.units.forEach(u => scene.remove(u))); teams.forEach(t => t.units.length=0); allUnits = []; unitIndex.clear(); projectiles.splice(0).forEach(p => scene.remove(p.obj)); }
 
   function compositionFor(kind, size){
     const arr = [];
@@ -799,7 +857,7 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
       let x = center.x + (col-1)*1.8 + (Math.random()*0.6);
       let z = center.z + (row-(rows-1)/2)*2.4 + jitter;
       u.position.set(x, terrain.heightAtWorld(x,z), z);
-      scene.add(u); list.push(u); allUnits.push(u);
+      scene.add(u); list.push(u); allUnits.push(u); addToIndex(u);
     }
   }
 
@@ -813,7 +871,7 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
       const col = i % 3;
       let x = center.x + (col-1)*1.8;
       let z = center.z + (row-(rows-1)/2)*2.4;
-      u.position.set(x, terrain.heightAtWorld(x, z), z);
+      u.position.set(x, terrain.heightAtWorld(x, z), z); updateIndex(u);
     }
   }
 
@@ -863,6 +921,7 @@ initAI({
   tmpV,
   refreshSpawnMarker,
   spawnEdit,
+  updateIndex,
 });
 
 setupMatch();
