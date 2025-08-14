@@ -5,18 +5,22 @@ export function initAI(c){ ctx = c; }
 export function updateTeamCounts(){
   const { ui, teams } = ctx;
   const box = ui.teamsPanel;
-  const prev = Array.from(box.querySelectorAll('input.team-size')).map(i=>parseInt(i.value));
+  const prevSizes = Array.from(box.querySelectorAll('input.team-size')).map(i=>parseInt(i.value));
+  const prevComps = Array.from(box.querySelectorAll('select.team-comp')).map(s=>s.value);
   box.innerHTML = "";
   const tpl = document.getElementById('teamRowTemplate');
   for (let i=0;i<teams.length;i++){
     const t = teams[i];
-    const total = prev[i] || t.units.length;
+    const total = prevSizes[i] || t.units.length;
+    const compVal = prevComps[i] || ui.composition.value;
     const alive = t.units.filter(u=>u.userData.alive).length;
     const row = tpl.content.firstElementChild.cloneNode(true);
     row.querySelector('.dot').style.background = `#${t.color.toString(16).padStart(6,'0')}`;
     row.querySelector('.teamName').textContent = t.name;
     const inp = row.querySelector('.team-size');
     inp.value = total;
+    const sel = row.querySelector('.team-comp');
+    sel.value = compVal;
     row.querySelector('.fill').style.width = `${(100*alive/total).toFixed(1)}%`;
     row.querySelector('.team-count').textContent = `${alive}/${total}`;
     box.appendChild(row);
@@ -30,15 +34,21 @@ export function setupMatch(){
 
   const n = parseInt(ui.teamsCount.value||2);
   const inputs = ui.teamsPanel.querySelectorAll('input.team-size');
-  const def = parseInt(ui.teamSize.value||8);
-  const sizes = [];
+  const selects = ui.teamsPanel.querySelectorAll('select.team-comp');
+  const defSize = parseInt(ui.teamSize.value||8);
+  const defComp = ui.composition.value;
+  const configs = [];
   for (let i=0;i<n;i++){
     const v = parseInt(inputs[i]?.value);
-    sizes.push(isNaN(v) ? def : v);
+    const comp = selects[i]?.value;
+    configs.push({
+      size: isNaN(v) ? defSize : v,
+      comp: comp || defComp,
+    });
   }
 
   clearUnits();
-  buildTeams(sizes);
+  buildTeams(configs);
   allUnits.forEach(updateHPBar);
   updateTeamCounts();
 }

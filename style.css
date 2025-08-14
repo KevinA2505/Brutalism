@@ -57,6 +57,8 @@ select, input[type="number"]{
   .tag{ display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; background:rgba(255,255,255,.08); margin-right:6px; }
 .teamRow{ display:flex; align-items:center; gap:8px; margin:6px 0; }
 .dot{ width:10px; height:10px; border-radius:50%; display:inline-block; }
+.teamRow .team-size{ width:60px; flex:0 0 auto; }
+.teamRow .team-comp{ width:150px; flex:0 0 auto; }
 
 /* Nuevas secciones de configuración */
 .settings-section{ margin-top:16px; padding-top:10px; border-top:1px solid rgba(255,255,255,.08); }
