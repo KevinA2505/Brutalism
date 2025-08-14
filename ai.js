@@ -144,7 +144,7 @@ export function decideAndMove(u, dt){
     lookAt2D(u, tmpV);
 
     const R = u.userData.attackRange;
-    const ranged = (u.userData.type==="arquero"||u.userData.type==="mago"||u.userData.type==="lancero");
+    const ranged = (u.userData.type==="arquero"||u.userData.type==="mago"||u.userData.type==="lancero"||u.userData.type==="alquimista");
     const supporter = (u.userData.type==="sanador");
     const inRangeMelee = (!ranged && !supporter) && dist <= R+0.08;
     const inRangeRanged = (ranged) && dist <= R && dist >= 0.8;
@@ -185,6 +185,19 @@ export function decideAndMove(u, dt){
       if (u.userData.type === "arquero"){ setTimeout(() => { if (u.userData.alive && target.userData.alive) spawnProjectile(u, target, "flecha"); }, 140); }
       if (u.userData.type === "mago"){ setTimeout(() => { if (u.userData.alive && target.userData.alive) spawnProjectile(u, target, "bola"); }, 220); }
       if (u.userData.type === "lancero"){ setTimeout(() => { if (u.userData.alive && target.userData.alive) spawnProjectile(u, target, "jabalina"); }, 160); }
+      if (u.userData.type === "alquimista"){
+        const low = lowestAlly(u);
+        let potion = "veneno";
+        let targ = target;
+        if (low && low.ratio < 0.8 && low.ally.position.distanceTo(u.position) <= R){
+          potion = "cura"; targ = low.ally;
+        } else {
+          const cluster = enemiesOf(u).filter(e=>e.userData.alive && e.position.distanceTo(target.position) < 1.4);
+          if (cluster.length >= 2) potion = "fuego";
+        }
+        const ptarg = targ; const ptype = potion;
+        setTimeout(() => { if (u.userData.alive && ptarg.userData.alive) spawnProjectile(u, ptarg, "pocion", ptype); }, 180);
+      }
     }
     if (u.userData.isAttacking){
       u.userData.attackAnim += dt * (1.0 / 0.28) * simState.speedMul; const tt = clamp(u.userData.attackAnim, 0, 1); const swing = Math.sin(tt * Math.PI);
