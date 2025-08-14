@@ -90,6 +90,10 @@ export function decideAndMove(u, dt){
   if (!u.userData.alive) return;
   u.userData.stateT -= dt;
   if (u.userData.stateT < 0 && u.userData.state === "flee") u.userData.state = "";
+  if (u.userData.slowT > 0){
+    u.userData.slowT -= dt * simState.speedMul;
+    if (u.userData.slowT <= 0) u.userData.speedFactor = 1;
+  }
 
   u.userData.retargetT -= dt;
   if (u.userData.retargetT <= 0 || !u.userData.target || !u.userData.target.userData.alive){
@@ -125,7 +129,7 @@ export function decideAndMove(u, dt){
     lookAt2D(u, tmpV);
 
     const R = u.userData.attackRange;
-    const ranged = (u.userData.type==="arquero"||u.userData.type==="mago");
+    const ranged = (u.userData.type==="arquero"||u.userData.type==="mago"||u.userData.type==="lancero");
     const supporter = (u.userData.type==="sanador");
     const inRangeMelee = (!ranged && !supporter) && dist <= R+0.08;
     const inRangeRanged = (ranged) && dist <= R && dist >= 0.8;
@@ -165,6 +169,7 @@ export function decideAndMove(u, dt){
       u.userData.attackT = u.userData.attackCooldown; u.userData.isAttacking = true; u.userData.attackAnim = 0; u.userData.hitApplied = false;
       if (u.userData.type === "arquero"){ setTimeout(() => { if (u.userData.alive && target.userData.alive) spawnProjectile(u, target, "flecha"); }, 140); }
       if (u.userData.type === "mago"){ setTimeout(() => { if (u.userData.alive && target.userData.alive) spawnProjectile(u, target, "bola"); }, 220); }
+      if (u.userData.type === "lancero"){ setTimeout(() => { if (u.userData.alive && target.userData.alive) spawnProjectile(u, target, "jabalina"); }, 160); }
     }
     if (u.userData.isAttacking){
       u.userData.attackAnim += dt * (1.0 / 0.28) * simState.speedMul; const tt = clamp(u.userData.attackAnim, 0, 1); const swing = Math.sin(tt * Math.PI);
@@ -192,7 +197,7 @@ export function decideAndMove(u, dt){
   desire.add(avoidObstacles(u.position));
   if (desire.lengthSq() > 0.0001){
     desire.normalize();
-    u.position.addScaledVector(desire, u.userData.speed * dt * simState.speedMul);
+    u.position.addScaledVector(desire, u.userData.speed * u.userData.speedFactor * dt * simState.speedMul);
     ground(u);
     u.userData.bobT += dt * 9 * simState.speedMul;
     const a = Math.sin(u.userData.bobT) * 0.45, b = Math.cos(u.userData.bobT) * 0.45;

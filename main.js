@@ -492,8 +492,8 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
   }
 
   // ======= Unidades (modelos por clase) =======
-  const BASE_SPEEDS = { guerrero:2.2, tanque:1.75, picaro:3.05, arquero:2.35, mago:2.1 };
-  const NONHEALER_AVG_SPEED = (BASE_SPEEDS.guerrero + BASE_SPEEDS.tanque + BASE_SPEEDS.picaro + BASE_SPEEDS.arquero + BASE_SPEEDS.mago) / 5.0;
+  const BASE_SPEEDS = { guerrero:2.2, tanque:1.75, picaro:3.05, arquero:2.35, mago:2.1, lancero:2.4 };
+  const NONHEALER_AVG_SPEED = (BASE_SPEEDS.guerrero + BASE_SPEEDS.tanque + BASE_SPEEDS.picaro + BASE_SPEEDS.arquero + BASE_SPEEDS.mago + BASE_SPEEDS.lancero) / 6.0;
 
   function attachShield(leftPivot, size=0.7, color=0x9aa6b2){
     const shield = new THREE.Mesh(
@@ -547,6 +547,11 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
     } else if (type === "arquero"){
       mesh = new THREE.Mesh(new THREE.TorusBufferGeometry(0.36, 0.02, 8, 16, Math.PI), new THREE.MeshStandardMaterial({ color: 0xdeb887, roughness:.8 }));
       mesh.rotation.z = Math.PI/2; mesh.position.set(0, -0.6, 0.15);
+    } else if (type === "lancero"){
+      mesh = new THREE.Mesh(new THREE.CylinderBufferGeometry(0.04, 0.04, 1.4, 6), new THREE.MeshStandardMaterial({ color: 0xd7c398, metalness:.3, roughness:.5 }));
+      mesh.position.set(0, -1.1, 0);
+      const tip = new THREE.Mesh(new THREE.ConeBufferGeometry(0.08, 0.16, 6), new THREE.MeshStandardMaterial({ color: 0x888888 }));
+      tip.position.y = 0.7; mesh.add(tip);
     } else if (type === "mago" || type === "sanador"){
       mesh = new THREE.Mesh(new THREE.CylinderBufferGeometry(0.05, 0.05, 1.7, 10), new THREE.MeshStandardMaterial({ color: (type==="sanador"?0x88ffcc:0xccccff), metalness:.1, roughness:.6 }));
       mesh.position.set(0, -1.05, 0);
@@ -559,7 +564,7 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
   function makeUnit(type, colorHex, teamRef){
     const root = new THREE.Group();
     // Silueta: ancho/alto varía por clase
-    const scaleMap = { guerrero:1.0, tanque:1.15, picaro:0.9, arquero:0.95, mago:0.95, sanador:0.95 };
+    const scaleMap = { guerrero:1.0, tanque:1.15, picaro:0.9, arquero:0.95, mago:0.95, sanador:0.95, lancero:1.0 };
     const h = 1.2 * scaleMap[type];
     const body = new THREE.Mesh(new THREE.CylinderBufferGeometry(0.3*scaleMap[type], 0.42*scaleMap[type], h, 16), new THREE.MeshStandardMaterial({ color: colorHex, roughness:.7, metalness:.1 }));
     body.castShadow = true; body.position.y = h*0.5; root.add(body);
@@ -602,6 +607,7 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
       tanque:   { hp:200, speed:BASE_SPEEDS.tanque * 1.05,    dmg:[12,22], range:1.4,  cd:1.05, aoe:1.2 },
       picaro:   { hp:92,  speed:BASE_SPEEDS.picaro * 1.05,    dmg:[7,14],  range:1.25, cd:0.55, critBack:2.0, dodge:0.18 },
       arquero:  { hp:96,  speed:BASE_SPEEDS.arquero,   dmg:[8,15],  range:6.3,  cd:0.9,  projSpeed:11.0, keep:6.2, minKite:3.6 },
+      lancero:  { hp:110, speed:BASE_SPEEDS.lancero,   dmg:[9,17],  range:5.0,  cd:1.0,  projSpeed:10.5, keep:5.6, minKite:3.2, slowDur:1.5 },
       mago:     { hp:86,  speed:BASE_SPEEDS.mago,      dmg:[14,24], range:7.1,  cd:1.4,  projSpeed:8.5, splash:1.3, keep:6.6, minKite:3.6 },
       sanador:  { hp:86,  speed:NONHEALER_AVG_SPEED*0.82, dmg:[0,0], range:1.2,  cd:1.0,  heal:[12,20], healRange:7.0, healCd:1.15, projSpeed:9.0, keep:7.2 }
     };
@@ -617,7 +623,8 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
       isAttacking: false, attackAnim: 0, hitApplied: false,
       bobT: Math.random()*Math.PI*2, hpNode: hp, rightPivot, leftPivot, rightArm, leftArm, trail, weapon, torch,
       aoe: stats.aoe || 0, critBack: stats.critBack || 1.0, dodge: stats.dodge || 0.0,
-      projSpeed: stats.projSpeed || 0, keep: stats.keep || 0, minKite: stats.minKite || 0,
+      projSpeed: stats.projSpeed || 0, keep: stats.keep || 0, minKite: stats.minKite || 0, slowDur: stats.slowDur || 0,
+      speedFactor: 1, slowT: 0,
       // healer
       healMin: stats.heal?stats.heal[0]:0, healMax: stats.heal?stats.heal[1]:0, healRange: stats.healRange || 0, healCd: stats.healCd || 0,
       alive: true, target: null, retargetT: Math.random()*0.5,
@@ -634,6 +641,9 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
     if (kind === "flecha"){
       mesh = new THREE.Mesh(new THREE.CylinderBufferGeometry(0.02, 0.02, 0.7, 6), new THREE.MeshBasicMaterial({ color: 0xffe0a8 }));
       const tip = new THREE.Mesh(new THREE.ConeBufferGeometry(0.05, 0.12, 6), new THREE.MeshBasicMaterial({ color: 0x888888 })); tip.position.y = 0.35; mesh.add(tip);
+    } else if (kind === "jabalina"){
+      mesh = new THREE.Mesh(new THREE.CylinderBufferGeometry(0.04, 0.04, 0.9, 6), new THREE.MeshBasicMaterial({ color: 0xd7c398 }));
+      const tip = new THREE.Mesh(new THREE.ConeBufferGeometry(0.09, 0.18, 6), new THREE.MeshBasicMaterial({ color: 0x888888 })); tip.position.y = 0.45; mesh.add(tip);
     } else if (kind === "bola"){
       mesh = new THREE.Mesh(new THREE.SphereBufferGeometry(0.16, 12, 12), new THREE.MeshBasicMaterial({ color: 0xff8855 }));
     } else if (kind === "cura"){
@@ -651,7 +661,7 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
       tmpV.copy(p.target.position).add({x:0,y:1.2,z:0}).sub(p.obj.position);
       const d = tmpV.length(); tmpV.normalize();
       p.obj.position.addScaledVector(tmpV, p.speed * dt);
-      if (p.kind === "flecha"){
+      if (p.kind === "flecha" || p.kind === "jabalina"){
         const yaw = Math.atan2(tmpV.x, tmpV.z), pitch = Math.asin(tmpV.y); p.obj.rotation.set(-pitch, yaw, 0);
       }
       if (d < 0.4){
@@ -664,6 +674,10 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
           if (p.kind === "bola"){
             enemiesOf(p.owner).forEach(e => { if (e.userData.alive && e !== p.target && e.position.distanceTo(p.obj.position) <= (p.owner.userData.splash || 1.3)){ applyDamage(e, Math.floor(dmg*0.75), p.obj.position); } });
             triggerShake(0.2, 0.12);
+          } else if (p.kind === "jabalina"){
+            const t = p.target.userData;
+            t.speedFactor = Math.min(t.speedFactor, 0.5);
+            t.slowT = Math.max(t.slowT, p.owner.userData.slowDur || 0);
           }
         }
         scene.remove(p.obj); projectiles.splice(i,1);
@@ -727,19 +741,19 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
   function compositionFor(kind, size){
     const arr = [];
     if (kind === "balanced"){
-      const base = ["guerrero","tanque","picaro","arquero","mago","sanador"];
+      const base = ["guerrero","tanque","picaro","arquero","lancero","mago","sanador"];
       while (arr.length < size) arr.push(base[arr.length % base.length]);
     } else if (kind === "melee"){
       const base = ["guerrero","tanque","picaro","tanque"];
       while (arr.length < size) arr.push(base[arr.length % base.length]);
     } else if (kind === "ranged"){
-      const base = ["arquero","mago","picaro","arquero"];
+      const base = ["arquero","mago","lancero","picaro","arquero"];
       while (arr.length < size) arr.push(base[arr.length % base.length]);
     } else if (kind === "support"){
       const base = ["tanque","guerrero","sanador","arquero","mago","sanador"];
       while (arr.length < size) arr.push(base[arr.length % base.length]);
     } else {
-      const base = ["guerrero","tanque","picaro","arquero","mago","sanador"];
+      const base = ["guerrero","tanque","picaro","arquero","lancero","mago","sanador"];
       while (arr.length < size) arr.push(randChoice(base));
     }
     return arr;
