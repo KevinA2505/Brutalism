@@ -312,6 +312,11 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
     ui.teamsPanel.querySelectorAll('input.team-size').forEach(inp => { inp.value = v; });
     setupMatch();
   });
+  ui.composition.addEventListener('change', () => {
+    const val = ui.composition.value;
+    ui.teamsPanel.querySelectorAll('select.team-comp').forEach(sel => { sel.value = val; });
+    setupMatch();
+  });
 
   function log(text){ const d = new Date().toLocaleTimeString(); ui.log.insertAdjacentHTML('beforeend', `<div>[${d}] ${text}</div>`); ui.log.scrollTop = ui.log.scrollHeight; }
 
@@ -638,17 +643,19 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
     }
   }
 
-  function buildTeams(sizes){
+  function buildTeams(configs){
     teams = [];
-    for (let i=0;i<sizes.length;i++){
+    for (let i=0;i<configs.length;i++){
       const meta = TEAM_META[i];
       teams.push({ id:i, name: meta.name, color: meta.color, units: [] });
     }
-    // distribuir ángulos y crear cada equipo con su tamaño
+    // distribuir ángulos y crear cada equipo con su configuración
     for (let i=0;i<teams.length;i++){
       const ang = i * (Math.PI*2 / teams.length);
-      const size = clamp(parseInt(sizes[i])||8, 4, 16);
-      const comp = compositionFor(ui.composition.value, size);
+      const cfg = configs[i] || {};
+      const size = clamp(parseInt(cfg.size)||8, 4, 16);
+      const compKind = cfg.comp || ui.composition.value;
+      const comp = compositionFor(compKind, size);
       spawnTeam(teams[i], comp, ang);
     }
   }
