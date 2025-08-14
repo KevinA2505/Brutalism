@@ -144,12 +144,16 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
       return Math.sqrt(dx*dx + dz*dz);
     }
     roughSlider.addEventListener('input', () => {
-      document.getElementById('roughLbl').textContent = parseFloat(roughSlider.value).toFixed(1);
-      recolor(); respawnDecor();
+      roughness = parseFloat(roughSlider.value || 1.8);
+      document.getElementById('roughLbl').textContent = roughness.toFixed(1);
+      recolor();
+      respawnDecor();
     });
     mtnSlider.addEventListener('input', () => {
-      document.getElementById('mtnLbl').textContent = parseFloat(mtnSlider.value).toFixed(2);
-      recolor(); respawnDecor();
+      mountaininess = parseFloat(mtnSlider.value || 0.55);
+      document.getElementById('mtnLbl').textContent = mountaininess.toFixed(2);
+      recolor();
+      respawnDecor();
     });
     return { mesh, heightAtWorld, slopeAt };
   }
