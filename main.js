@@ -282,6 +282,49 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
     u.position.addScaledVector(tmpV, dt);
   }
 
+  // ====== Edición de spawn ======
+  const raycaster = new THREE.Raycaster();
+  const mouse = new THREE.Vector2();
+  const spawnEdit = { active:false, teamIdx:-1, marker:null, dragging:false };
+
+  function showSpawnMarker(){
+    if (spawnEdit.teamIdx < 0 || spawnEdit.teamIdx >= teams.length) return;
+    const team = teams[spawnEdit.teamIdx];
+    if (!spawnEdit.marker){
+      const geo = new THREE.SphereBufferGeometry(0.6, 16, 16);
+      const mat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+      spawnEdit.marker = new THREE.Mesh(geo, mat);
+      scene.add(spawnEdit.marker);
+    }
+    const { x, z } = team.spawn;
+    spawnEdit.marker.position.set(x, terrain.heightAtWorld(x, z) + 0.6, z);
+    spawnEdit.marker.visible = true;
+  }
+  function hideSpawnMarker(){ if (spawnEdit.marker) spawnEdit.marker.visible = false; }
+  function enterSpawnEdit(idx){ spawnEdit.active = true; spawnEdit.teamIdx = idx; showSpawnMarker(); }
+  function exitSpawnEdit(){ spawnEdit.active = false; spawnEdit.teamIdx = -1; hideSpawnMarker(); }
+  function updateSpawnFromEvent(e){
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+    const hit = raycaster.intersectObject(terrain.mesh)[0];
+    if (hit){
+      const { x, z, y } = hit.point;
+      const team = teams[spawnEdit.teamIdx];
+      team.spawn.set(x, 0, z);
+      spawnEdit.marker.position.set(x, y + 0.6, z);
+    }
+  }
+  function refreshSpawnMarker(){
+    if (spawnEdit.active){
+      if (spawnEdit.teamIdx >= teams.length) exitSpawnEdit();
+      else showSpawnMarker();
+    } else {
+      hideSpawnMarker();
+    }
+  }
+
   // ======= UI =======
   const ui = {
     status: document.getElementById('statusTxt'),
@@ -316,6 +359,31 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
     const val = ui.composition.value;
     ui.teamsPanel.querySelectorAll('select.team-comp').forEach(sel => { sel.value = val; });
     setupMatch();
+  });
+
+  ui.teamsPanel.addEventListener('click', (e) => {
+    const row = e.target.closest('.teamRow');
+    if (!row) return;
+    if (e.target.matches('input, select')) return;
+    const idx = Array.from(ui.teamsPanel.children).indexOf(row);
+    if (spawnEdit.active && spawnEdit.teamIdx === idx) exitSpawnEdit();
+    else enterSpawnEdit(idx);
+  });
+
+  canvas.addEventListener('pointerdown', (e) => {
+    if (!spawnEdit.active) return;
+    e.preventDefault(); e.stopPropagation();
+    spawnEdit.dragging = true; updateSpawnFromEvent(e);
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!spawnEdit.active || !spawnEdit.dragging) return;
+    e.preventDefault(); e.stopPropagation();
+    updateSpawnFromEvent(e);
+  });
+  canvas.addEventListener('pointerup', (e) => {
+    if (!spawnEdit.active) return;
+    e.stopPropagation();
+    spawnEdit.dragging = false;
   });
 
   function log(text){ const d = new Date().toLocaleTimeString(); ui.log.insertAdjacentHTML('beforeend', `<div>[${d}] ${text}</div>`); ui.log.scrollTop = ui.log.scrollHeight; }
@@ -627,10 +695,9 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
     return arr;
   }
 
-  function spawnTeam(teamRef, comp, angle){
+  function spawnTeam(teamRef, comp){
     const list = teamRef.units;
-    const radius = 20.0; // más separación
-    const center = new THREE.Vector3(Math.sin(angle)*radius, 0, Math.cos(angle)*radius);
+    const center = teamRef.spawn.clone();
     const rows = Math.ceil(comp.length / 3);
     for (let i=0;i<comp.length;i++){
       const type = comp[i]; const u = makeUnit(type, teamRef.color, teamRef);
@@ -644,20 +711,24 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
   }
 
   function buildTeams(configs){
+    const prevSpawns = teams.map(t => t.spawn);
     teams = [];
     for (let i=0;i<configs.length;i++){
       const meta = TEAM_META[i];
-      teams.push({ id:i, name: meta.name, color: meta.color, units: [] });
+      const ang = i * (Math.PI*2 / configs.length);
+      const defSpawn = new THREE.Vector3(Math.sin(ang)*20.0, 0, Math.cos(ang)*20.0);
+      const spawn = prevSpawns[i] ? prevSpawns[i] : defSpawn;
+      teams.push({ id:i, name: meta.name, color: meta.color, units: [], spawn });
     }
-    // distribuir ángulos y crear cada equipo con su configuración
+    // crear cada equipo con su configuración
     for (let i=0;i<teams.length;i++){
-      const ang = i * (Math.PI*2 / teams.length);
       const cfg = configs[i] || {};
       const size = clamp(parseInt(cfg.size)||8, 4, 16);
       const compKind = cfg.comp || ui.composition.value;
       const comp = compositionFor(compKind, size);
-      spawnTeam(teams[i], comp, ang);
+      spawnTeam(teams[i], comp);
     }
+    return teams;
   }
 
 
@@ -683,6 +754,8 @@ initAI({
   clamp,
   ARENA_R,
   tmpV,
+  refreshSpawnMarker,
+  spawnEdit,
 });
 
 setupMatch();
