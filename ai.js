@@ -66,7 +66,7 @@ export function setupMatch(){
 }
 
 export function selectTarget(u){
-  const enemies = ctx.enemiesOf(u);
+  const enemies = ctx.enemiesOf(u, ctx.ARENA_R * 2);
   if (enemies.length === 0) return null;
   let best = enemies[0], bestScore = Infinity;
   for (let i=0;i<enemies.length;i++){
@@ -80,7 +80,7 @@ export function selectTarget(u){
 }
 
 function lowestAlly(u){
-  const allies = ctx.alliesOf(u).filter(a=>a.userData.alive);
+  const allies = ctx.alliesOf(u, 20).filter(a=>a.userData.alive);
   if (allies.length===0) return null;
   let best = null, bestRatio = 1e9;
   for (let i=0;i<allies.length;i++){
@@ -91,7 +91,7 @@ function lowestAlly(u){
 }
 
 export function decideAndMove(u, dt){
-  const { THREE, simState, enemiesOf, alliesOf, blockedLOS, avoidObstacles, spawnProjectile, applyDamage, triggerShake, ground, crowdRepel, lookAt2D, clamp, ARENA_R, ui, tmpV } = ctx;
+  const { THREE, simState, enemiesOf, alliesOf, blockedLOS, avoidObstacles, spawnProjectile, applyDamage, triggerShake, ground, crowdRepel, lookAt2D, clamp, ARENA_R, ui, tmpV, updateIndex } = ctx;
   if (!u.userData.alive) return;
   u.userData.stateT -= dt;
   if (u.userData.stateT < 0 && u.userData.state === "flee") u.userData.state = "";
@@ -108,18 +108,8 @@ export function decideAndMove(u, dt){
   const target = u.userData.target;
 
   const hpRatio = u.userData.health / u.userData.maxHealth;
-  let nearbyEnemies = 0;
-  let nearbyAllies = 0;
-  const enemiesList = enemiesOf(u);
-  for (let i = 0; i < enemiesList.length; i++){
-    const e = enemiesList[i];
-    if (e.userData.alive && e.position.distanceTo(u.position) < 4.8) nearbyEnemies++;
-  }
-  const alliesList = alliesOf(u);
-  for (let i = 0; i < alliesList.length; i++){
-    const a = alliesList[i];
-    if (a.userData.alive && a.position.distanceTo(u.position) < 4.8) nearbyAllies++;
-  }
+  const nearbyEnemies = enemiesOf(u, 4.8).length;
+  const nearbyAllies = alliesOf(u, 4.8).length;
   const desire = tmpVec1.set(0,0,0);
 
   const outnumbered = (nearbyEnemies - nearbyAllies) >= 2;
@@ -159,12 +149,15 @@ export function decideAndMove(u, dt){
     }
 
     if (supporter){
-      const danger = enemiesOf(u).some(e => e.position.distanceTo(u.position) < 4.5);
+      const danger = enemiesOf(u, 4.5).length > 0;
       const low = lowestAlly(u);
       if (danger){
-        const nearest = enemiesOf(u).reduce((a,b)=> (a.position.distanceTo(u.position) < b.position.distanceTo(u.position))?a:b);
-        const away = tmpVec2.copy(u.position).sub(nearest.position).normalize();
-        desire.add(away.multiplyScalar(1.1));
+        const near = enemiesOf(u, 6);
+        if (near.length){
+          const nearest = near.reduce((a,b)=> (a.position.distanceTo(u.position) < b.position.distanceTo(u.position))?a:b);
+          const away = tmpVec2.copy(u.position).sub(nearest.position).normalize();
+          desire.add(away.multiplyScalar(1.1));
+        }
       }
       if (low && low.ratio < 0.95){
         const ally = low.ally; const d = ally.position.distanceTo(u.position);
@@ -192,7 +185,7 @@ export function decideAndMove(u, dt){
         if (low && low.ratio < 0.8 && low.ally.position.distanceTo(u.position) <= R){
           potion = "cura"; targ = low.ally;
         } else {
-          const cluster = enemiesOf(u).filter(e=>e.userData.alive && e.position.distanceTo(target.position) < 1.4);
+          const cluster = enemiesOf(u, 1.4, target.position);
           if (cluster.length >= 2) potion = "fuego";
         }
         const ptarg = targ; const ptype = potion;
@@ -207,7 +200,7 @@ export function decideAndMove(u, dt){
         u.userData.hitApplied = true;
         let dmg = Math.floor(THREE.MathUtils.lerp(u.userData.damageMin, u.userData.damageMax, Math.random()));
         if (u.userData.type === "tanque" && u.userData.aoe){
-          enemiesOf(u).forEach(e => { if (e.userData.alive && e.position.distanceTo(target.position) <= u.userData.aoe + 0.3){ applyDamage(e, dmg, tmpVec2.copy(e.position).setY(1.1)); } });
+          enemiesOf(u, u.userData.aoe + 0.3, target.position).forEach(e => { applyDamage(e, dmg, tmpVec2.copy(e.position).setY(1.1)); });
           triggerShake(0.22, 0.12);
         } else {
           if (u.userData.type === "picaro"){
@@ -241,5 +234,6 @@ export function decideAndMove(u, dt){
     const pull = (r - (ARENA_R-1.0)); u.position.addScaledVector(tmpVec2.copy(u.position).multiplyScalar(-1/r), pull*0.7);
     ground(u);
   }
+  updateIndex(u);
 }
 
