@@ -295,6 +295,7 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
     speedLbl: document.getElementById('speedLbl'),
     composition: document.getElementById('composition'),
     teamSize: document.getElementById('teamSize'),
+    teamSizeLbl: document.getElementById('teamSizeLbl'),
     teamsCount: document.getElementById('teamsCount'),
     teamsLbl: document.getElementById('teamsLbl'),
     teamsPanel: document.getElementById('teamsPanel'),
@@ -305,6 +306,12 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
   ui.satellite.addEventListener('change', () => { controls.satellite = ui.satellite.checked; });
   controls.satellite = ui.satellite.checked;
   ui.teamsCount.addEventListener('input', ()=>{ ui.teamsLbl.textContent = ui.teamsCount.value; setupMatch(); });
+  ui.teamSize.addEventListener('input', () => {
+    const v = parseInt(ui.teamSize.value || 8);
+    ui.teamSizeLbl.textContent = v;
+    ui.teamsPanel.querySelectorAll('input.team-size').forEach(inp => { inp.value = v; });
+    setupMatch();
+  });
 
   function log(text){ const d = new Date().toLocaleTimeString(); ui.log.insertAdjacentHTML('beforeend', `<div>[${d}] ${text}</div>`); ui.log.scrollTop = ui.log.scrollHeight; }
 
