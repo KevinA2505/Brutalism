@@ -5,17 +5,20 @@ export function initAI(c){ ctx = c; }
 export function updateTeamCounts(){
   const { ui, teams } = ctx;
   const box = ui.teamsPanel;
+  const prev = Array.from(box.querySelectorAll('input.team-size')).map(i=>parseInt(i.value));
   box.innerHTML = "";
+  const tpl = document.getElementById('teamRowTemplate');
   for (let i=0;i<teams.length;i++){
     const t = teams[i];
-    const total = t.units.length;
+    const total = prev[i] || t.units.length;
     const alive = t.units.filter(u=>u.userData.alive).length;
-    const row = document.createElement('div'); row.className = 'teamRow';
-    row.innerHTML = `
-        <span class="dot" style="background:#${t.color.toString(16).padStart(6,'0')}"></span>
-        <strong style="min-width:84px">${t.name}</strong>
-        <div class="bar" style="flex:1"><div class="fill" style="width:${(100*alive/total).toFixed(1)}%"></div></div>
-        <span style="width:64px; text-align:right">${alive}/${total}</span>`;
+    const row = tpl.content.firstElementChild.cloneNode(true);
+    row.querySelector('.dot').style.background = `#${t.color.toString(16).padStart(6,'0')}`;
+    row.querySelector('.teamName').textContent = t.name;
+    const inp = row.querySelector('.team-size');
+    inp.value = total;
+    row.querySelector('.fill').style.width = `${(100*alive/total).toFixed(1)}%`;
+    row.querySelector('.team-count').textContent = `${alive}/${total}`;
     box.appendChild(row);
   }
 }
@@ -24,8 +27,18 @@ export function setupMatch(){
   const { simState, ui, clearUnits, buildTeams, allUnits, updateHPBar } = ctx;
   simState.active = false; simState.paused = false;
   ui.start.disabled = false; ui.pause.disabled = true; ui.pause.textContent = "Pausar"; ui.status.textContent = "Preparado.";
+
+  const n = parseInt(ui.teamsCount.value||2);
+  const inputs = ui.teamsPanel.querySelectorAll('input.team-size');
+  const def = parseInt(ui.teamSize.value||8);
+  const sizes = [];
+  for (let i=0;i<n;i++){
+    const v = parseInt(inputs[i]?.value);
+    sizes.push(isNaN(v) ? def : v);
+  }
+
   clearUnits();
-  buildTeams(parseInt(ui.teamsCount.value||2));
+  buildTeams(sizes);
   allUnits.forEach(updateHPBar);
   updateTeamCounts();
 }
