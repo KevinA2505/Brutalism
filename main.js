@@ -15,9 +15,22 @@ const simState = { active: false, paused: false, speedMul: 1.0 };
 const { camera, controls } = initCamera(renderer, canvas, simState);
 
   // Luces
-  scene.add(new THREE.AmbientLight(0x446688, 0.38));
-  const dir = new THREE.DirectionalLight(0xffffff, 1.0); dir.position.set(20, 30, 12);
-  dir.castShadow = true; dir.shadow.mapSize.set(4096, 4096); dir.shadow.camera.near = 0.5; dir.shadow.camera.far = 420; scene.add(dir);
+  const ambient = new THREE.AmbientLight(0x446688, 0.38);
+  scene.add(ambient);
+  const dir = new THREE.DirectionalLight(0xffffff, 1.0);
+  dir.castShadow = true;
+  dir.shadow.mapSize.set(4096, 4096);
+  dir.shadow.camera.near = 0.5;
+  dir.shadow.camera.far = 420;
+  dir.position.set(20, 30, 12);
+  scene.add(dir);
+
+  let timeOfDay = 0;
+  let daySpeed = 1.0;
+  const ambNight = new THREE.Color(0x223355);
+  const ambDay = new THREE.Color(0xffffff);
+  const sunRise = new THREE.Color(0xffddb1);
+  const sunDay = new THREE.Color(0xffffff);
 
   // ===== Terreno con montañas y planicies (FBM + ridged + domain warp) =====
   const ARENA_R = 36;
@@ -339,6 +352,8 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
     log:    document.getElementById('log'),
     speed: document.getElementById('speed'),
     speedLbl: document.getElementById('speedLbl'),
+    cycle: document.getElementById('cycleSpeed'),
+    cycleLbl: document.getElementById('cycleSpeedLbl'),
     composition: document.getElementById('composition'),
     teamSize: document.getElementById('teamSize'),
     teamSizeLbl: document.getElementById('teamSizeLbl'),
@@ -365,6 +380,7 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
   });
   expandUI();
   ui.speed.addEventListener('input', () => { simState.speedMul = parseFloat(ui.speed.value); ui.speedLbl.textContent = simState.speedMul.toFixed(2) + "x"; });
+  ui.cycle.addEventListener('input', () => { daySpeed = parseFloat(ui.cycle.value); ui.cycleLbl.textContent = daySpeed.toFixed(2) + "x"; });
   ui.satellite.addEventListener('change', () => { controls.satellite = ui.satellite.checked; });
   controls.satellite = ui.satellite.checked;
   ui.teamsCount.addEventListener('input', ()=>{ ui.teamsLbl.textContent = ui.teamsCount.value; setupMatch(); });
@@ -813,12 +829,24 @@ setupMatch();
     controls.target.lerp(new THREE.Vector3(cx, 1, cz), 0.06);
   }
 
+  function updateLights(){
+    const cycle = Math.max(0, Math.sin(timeOfDay));
+    ambient.intensity = 0.2 + cycle * 0.3;
+    dir.intensity = 0.2 + cycle * 0.8;
+    ambient.color.copy(ambNight).lerp(ambDay, cycle);
+    dir.color.copy(sunRise).lerp(sunDay, cycle);
+    dir.position.set(Math.cos(timeOfDay) * 20, Math.sin(timeOfDay) * 30, 12);
+  }
+
   let last = performance.now();
   function frame(){
     requestAnimationFrame(frame);
     const now = performance.now();
       let dt = Math.min(0.05, (now - last) / 1000); last = now;
       if (simState.paused) dt = 0;
+
+      timeOfDay = (timeOfDay + dt * daySpeed) % (Math.PI * 2);
+      updateLights();
 
       if (simState.active && !simState.paused){
         for (let i=0;i<allUnits.length;i++) decideAndMove(allUnits[i], dt);
