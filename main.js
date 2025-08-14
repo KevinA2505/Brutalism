@@ -193,12 +193,15 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
     mesh.castShadow = true; mesh.receiveShadow = true;
     return { mesh, radius: 0.9 };
   }
+  const tmpSegD = new THREE.Vector3();
+  const tmpSegF = new THREE.Vector3();
+  const tmpSegProj = new THREE.Vector3();
   function segmentIntersectsSphere(p0, p1, c, r){
-    const d = new THREE.Vector3().subVectors(p1, p0);
-    const f = new THREE.Vector3().subVectors(p0, c);
-    const t = THREE.MathUtils.clamp( -f.dot(d) / d.lengthSq(), 0, 1 );
-    const proj = new THREE.Vector3().addVectors(p0, d.multiplyScalar(t));
-    return proj.distanceTo(c) <= r;
+    tmpSegD.subVectors(p1, p0);
+    tmpSegF.subVectors(p0, c);
+    const t = THREE.MathUtils.clamp( -tmpSegF.dot(tmpSegD) / tmpSegD.lengthSq(), 0, 1 );
+    tmpSegProj.copy(p0).addScaledVector(tmpSegD, t);
+    return tmpSegProj.distanceTo(c) <= r;
   }
   function blockedLOS(aPos, bPos){
     for (let i=0;i<obstacles.length;i++){
