@@ -26,7 +26,7 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
   scene.add(dir);
 
   let timeOfDay = 0;
-  let daySpeed = 1.0;
+  let daySpeed = 0.8;
   const ambNight = new THREE.Color(0x223355);
   const ambDay = new THREE.Color(0xffffff);
   const sunRise = new THREE.Color(0xffddb1);
@@ -592,6 +592,11 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
     const trailMat = new THREE.MeshBasicMaterial({ color: 0xffffbb, transparent:true, opacity:0.0, side: THREE.DoubleSide });
     const trail = new THREE.Mesh(trailGeo, trailMat); trail.position.set(0.2, -0.9, 0); trail.rotation.x = Math.PI/2; rightPivot.add(trail);
 
+    const torch = new THREE.PointLight(0xffaa55, 0, 6, 2);
+    torch.castShadow = false;
+    torch.position.set(0, 1.2, 0);
+    root.add(torch);
+
     const statsMap = {
       guerrero: { hp:125, speed:BASE_SPEEDS.guerrero * 1.05,  dmg:[10,18], range:1.35, cd:0.75 },
       tanque:   { hp:200, speed:BASE_SPEEDS.tanque * 1.05,    dmg:[12,22], range:1.4,  cd:1.05, aoe:1.2 },
@@ -610,7 +615,7 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
       attackRange: stats.range, attackCooldown: stats.cd,
       attackT: 0, healT: 0,
       isAttacking: false, attackAnim: 0, hitApplied: false,
-      bobT: Math.random()*Math.PI*2, hpNode: hp, rightPivot, leftPivot, rightArm, leftArm, trail, weapon,
+      bobT: Math.random()*Math.PI*2, hpNode: hp, rightPivot, leftPivot, rightArm, leftArm, trail, weapon, torch,
       aoe: stats.aoe || 0, critBack: stats.critBack || 1.0, dodge: stats.dodge || 0.0,
       projSpeed: stats.projSpeed || 0, keep: stats.keep || 0, minKite: stats.minKite || 0,
       // healer
@@ -836,6 +841,8 @@ setupMatch();
     ambient.color.copy(ambNight).lerp(ambDay, cycle);
     dir.color.copy(sunRise).lerp(sunDay, cycle);
     dir.position.set(Math.cos(timeOfDay) * 20, Math.sin(timeOfDay) * 30, 12);
+    const torchIntensity = THREE.MathUtils.clamp((0.5 - cycle) * 0.8, 0, 0.4);
+    allUnits.forEach(u => { if (u.userData.torch) u.userData.torch.intensity = torchIntensity; });
   }
 
   let last = performance.now();
