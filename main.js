@@ -347,16 +347,23 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
     teamsPanel: document.getElementById('teamsPanel'),
     rough: document.getElementById('rough'),
     mtn: document.getElementById('mtn'),
+    rightPanel: document.querySelector('.panel.right'),
   };
   function collapseUI(){
-    ui.root.classList.add('ui-collapsed');
-    ui.toggle.style.display = 'block';
+    ui.root.classList.add('right-collapsed');
+    ui.toggle.textContent = '⊞';
+    ui.toggle.title = 'Maximizar panel';
   }
   function expandUI(){
-    ui.root.classList.remove('ui-collapsed');
-    ui.toggle.style.display = 'none';
+    ui.root.classList.remove('right-collapsed');
+    ui.toggle.textContent = '⊟';
+    ui.toggle.title = 'Minimizar panel';
   }
-  ui.toggle.addEventListener('click', expandUI);
+  ui.toggle.addEventListener('click', () => {
+    if (ui.root.classList.contains('right-collapsed')) expandUI();
+    else collapseUI();
+  });
+  expandUI();
   ui.speed.addEventListener('input', () => { simState.speedMul = parseFloat(ui.speed.value); ui.speedLbl.textContent = simState.speedMul.toFixed(2) + "x"; });
   ui.satellite.addEventListener('change', () => { controls.satellite = ui.satellite.checked; });
   controls.satellite = ui.satellite.checked;
