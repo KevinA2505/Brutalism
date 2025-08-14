@@ -28,58 +28,63 @@
         <div class="switch" style="align-self:end;"><input id="showTrails" type="checkbox" checked/><span>Estelas</span></div>
       </div>
 
-      <div class="row grid2">
-        <div>
-          <div class="kv"><span>Composición</span><span class="mini">por equipo</span></div>
-          <select id="composition">
-            <option value="balanced">Equilibrada (8)</option>
-            <option value="melee">Cuerpo a cuerpo (8)</option>
-            <option value="ranged">A distancia (8)</option>
-            <option value="support">Soporte (8)</option>
-            <option value="random">Aleatoria (8)</option>
-          </select>
+      <div class="settings-section">
+        <h4>Configuración global</h4>
+
+        <div class="row grid2">
+          <div>
+            <div class="kv"><span>Composición</span><span class="mini">por equipo</span></div>
+            <select id="composition">
+              <option value="balanced">Equilibrada (8)</option>
+              <option value="melee">Cuerpo a cuerpo (8)</option>
+              <option value="ranged">A distancia (8)</option>
+              <option value="support">Soporte (8)</option>
+              <option value="random">Aleatoria (8)</option>
+            </select>
+          </div>
+          <div>
+            <div class="kv"><span>Tamaño equipo</span><span class="mini">(4–16)</span></div>
+            <input id="teamSize" type="number" min="4" max="16" step="1" value="8" />
+          </div>
         </div>
-        <div>
-          <div class="kv"><span>Tamaño equipo</span><span class="mini">(4–16)</span></div>
-          <input id="teamSize" type="number" min="4" max="16" step="1" value="8" />
+
+        <div class="row grid2">
+          <div>
+            <div class="kv"><span>Número de ejércitos</span><span class="mini" id="teamsLbl">2</span></div>
+            <input id="teamsCount" type="range" min="2" max="5" step="1" value="2"/>
+          </div>
+          <div>
+            <div class="kv"><span>Radio estructuras</span><span class="mini" id="structRadLbl">1.00×</span></div>
+            <input id="structRad" type="range" min="0.6" max="1.6" step="0.05" value="1.0"/>
+          </div>
+        </div>
+
+        <div class="row grid2">
+          <div>
+            <div class="kv"><span>Piedras</span><span class="mini" id="rocksLbl">36</span></div>
+            <input id="rocks" type="range" min="0" max="160" step="2" value="36"/>
+          </div>
+          <div>
+            <div class="kv"><span>Árboles</span><span class="mini" id="treesLbl">48</span></div>
+            <input id="trees" type="range" min="0" max="220" step="2" value="48"/>
+          </div>
+        </div>
+
+        <div class="row grid2">
+          <div>
+            <div class="kv"><span>Rugosidad</span><span class="mini" id="roughLbl">1.8</span></div>
+            <input id="rough" type="range" min="0.8" max="3.2" step="0.1" value="1.8"/>
+          </div>
+          <div>
+            <div class="kv"><span>% Montañoso</span><span class="mini" id="mtnLbl">0.55</span></div>
+            <input id="mtn" type="range" min="0.2" max="0.85" step="0.01" value="0.55"/>
+          </div>
         </div>
       </div>
 
-      <div class="row grid2">
-        <div>
-          <div class="kv"><span>Número de ejércitos</span><span class="mini" id="teamsLbl">2</span></div>
-          <input id="teamsCount" type="range" min="2" max="5" step="1" value="2"/>
-        </div>
-        <div>
-          <div class="kv"><span>Radio estructuras</span><span class="mini" id="structRadLbl">1.00×</span></div>
-          <input id="structRad" type="range" min="0.6" max="1.6" step="0.05" value="1.0"/>
-        </div>
-      </div>
-
-      <div class="row grid2">
-        <div>
-          <div class="kv"><span>Piedras</span><span class="mini" id="rocksLbl">36</span></div>
-          <input id="rocks" type="range" min="0" max="160" step="2" value="36"/>
-        </div>
-        <div>
-          <div class="kv"><span>Árboles</span><span class="mini" id="treesLbl">48</span></div>
-          <input id="trees" type="range" min="0" max="220" step="2" value="48"/>
-        </div>
-      </div>
-
-      <div class="row grid2">
-        <div>
-          <div class="kv"><span>Rugosidad</span><span class="mini" id="roughLbl">1.8</span></div>
-          <input id="rough" type="range" min="0.8" max="3.2" step="0.1" value="1.8"/>
-        </div>
-        <div>
-          <div class="kv"><span>% Montañoso</span><span class="mini" id="mtnLbl">0.55</span></div>
-          <input id="mtn" type="range" min="0.2" max="0.85" step="0.01" value="0.55"/>
-        </div>
-      </div>
-
-      <div class="row">
-        <div id="teamsPanel"></div>
+      <div class="settings-section">
+        <h4>Ajustes por ejército</h4>
+        <div id="teamsPanel" class="team-settings"></div>
       </div>
 
       <div class="row">
