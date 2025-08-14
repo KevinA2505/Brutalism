@@ -631,17 +631,17 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
     }
   }
 
-  function buildTeams(n){
+  function buildTeams(sizes){
     teams = [];
-    const size = clamp(parseInt(ui.teamSize.value||8), 4, 16);
-    const comp = compositionFor(ui.composition.value, size);
-    for (let i=0;i<n;i++){
+    for (let i=0;i<sizes.length;i++){
       const meta = TEAM_META[i];
       teams.push({ id:i, name: meta.name, color: meta.color, units: [] });
     }
-    // distribuir ángulos
+    // distribuir ángulos y crear cada equipo con su tamaño
     for (let i=0;i<teams.length;i++){
       const ang = i * (Math.PI*2 / teams.length);
+      const size = clamp(parseInt(sizes[i])||8, 4, 16);
+      const comp = compositionFor(ui.composition.value, size);
       spawnTeam(teams[i], comp, ang);
     }
   }

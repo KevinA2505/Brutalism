@@ -82,10 +82,19 @@
         </div>
       </div>
 
-      <div class="settings-section">
-        <h4>Ajustes por ejército</h4>
-        <div id="teamsPanel" class="team-settings"></div>
-      </div>
+        <div class="settings-section">
+          <h4>Ajustes por ejército</h4>
+          <div id="teamsPanel" class="team-settings"></div>
+          <template id="teamRowTemplate">
+            <div class="teamRow">
+              <span class="dot"></span>
+              <strong class="teamName"></strong>
+              <input class="team-size" type="number" min="4" max="16" step="1" value="8"/>
+              <div class="bar" style="flex:1"><div class="fill"></div></div>
+              <span class="team-count" style="width:64px; text-align:right"></span>
+            </div>
+          </template>
+        </div>
 
       <div class="row">
         <div class="log" id="log"><div>[Sistema] Listo.</div></div>
