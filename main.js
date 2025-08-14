@@ -211,13 +211,20 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
     return false;
   }
 
+  const rocksSlider = document.getElementById('rocks');
+  const treesSlider = document.getElementById('trees');
+  const structRadSlider = document.getElementById('structRad');
+  const rocksLbl = document.getElementById('rocksLbl');
+  const treesLbl = document.getElementById('treesLbl');
+  const structRadLbl = document.getElementById('structRadLbl');
+
   function respawnDecor(){
-    const rockCount = parseInt(document.getElementById('rocks').value||36);
-    const treeCount = parseInt(document.getElementById('trees').value||48);
-    const factor = parseFloat(document.getElementById('structRad').value||1.0);
-    document.getElementById('rocksLbl').textContent = String(rockCount);
-    document.getElementById('treesLbl').textContent = String(treeCount);
-    document.getElementById('structRadLbl').textContent = factor.toFixed(2) + "×";
+    const rockCount = parseInt(rocksSlider.value||36);
+    const treeCount = parseInt(treesSlider.value||48);
+    const factor = parseFloat(structRadSlider.value||1.0);
+    rocksLbl.textContent = String(rockCount);
+    treesLbl.textContent = String(treeCount);
+    structRadLbl.textContent = factor.toFixed(2) + "×";
 
     obstacles.forEach(o => scene.remove(o.mesh || o.group));
     obstacles = [];
@@ -263,9 +270,9 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
     }
   }
   respawnDecor();
-  document.getElementById('rocks').addEventListener('input', respawnDecor);
-  document.getElementById('trees').addEventListener('input', respawnDecor);
-  document.getElementById('structRad').addEventListener('input', respawnDecor);
+  rocksSlider.addEventListener('input', respawnDecor);
+  treesSlider.addEventListener('input', respawnDecor);
+  structRadSlider.addEventListener('input', respawnDecor);
 
   // ========= Utilidades comunes =========
   const tmpV = new THREE.Vector3(), tmpV2 = new THREE.Vector3();
