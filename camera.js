@@ -2,6 +2,7 @@ export function initCamera(renderer, canvas, simState){
   const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 6000);
   const SATELLITE = { r: 66, phi: 0.62 };
   camera.position.set(0, 38, 56);
+  const tmpTargetPos = new THREE.Vector3();
   const controls = {
     satellite: true,
     target: new THREE.Vector3(0, 1, 0),
@@ -40,7 +41,7 @@ export function initCamera(renderer, canvas, simState){
       const x = r * Math.sin(this.spherical.phi) * Math.sin(this.spherical.theta);
       const y = r * Math.cos(this.spherical.phi);
       const z = r * Math.sin(this.spherical.phi) * Math.cos(this.spherical.theta);
-      const targetPos = new THREE.Vector3(x + this.panX, y + this.panY + 1, z);
+      const targetPos = tmpTargetPos.set(x + this.panX, y + this.panY + 1, z);
       camera.position.lerp(targetPos, 0.2);
       camera.lookAt(this.target.x + this.panX, this.target.y + this.panY, this.target.z);
     }
