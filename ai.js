@@ -103,11 +103,21 @@ export function decideAndMove(u, dt){
   const target = u.userData.target;
 
   const hpRatio = u.userData.health / u.userData.maxHealth;
-  const nearbyEnemies = enemiesOf(u).filter(e => e.userData.alive && e.position.distanceTo(u.position) < 4.8);
-  const nearbyAllies = alliesOf(u).filter(a => a.userData.alive && a.position.distanceTo(u.position) < 4.8);
+  let nearbyEnemies = 0;
+  let nearbyAllies = 0;
+  const enemiesList = enemiesOf(u);
+  for (let i = 0; i < enemiesList.length; i++){
+    const e = enemiesList[i];
+    if (e.userData.alive && e.position.distanceTo(u.position) < 4.8) nearbyEnemies++;
+  }
+  const alliesList = alliesOf(u);
+  for (let i = 0; i < alliesList.length; i++){
+    const a = alliesList[i];
+    if (a.userData.alive && a.position.distanceTo(u.position) < 4.8) nearbyAllies++;
+  }
   let desire = new THREE.Vector3(0,0,0);
 
-  const outnumbered = (nearbyEnemies.length - nearbyAllies.length) >= 2;
+  const outnumbered = (nearbyEnemies - nearbyAllies) >= 2;
   if ((hpRatio < 0.18) || (hpRatio < 0.4 && outnumbered)){
     u.userData.state = "flee"; u.userData.stateT = 2.5 + Math.random()*1.5;
   }
