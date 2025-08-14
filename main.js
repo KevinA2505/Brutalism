@@ -502,8 +502,8 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
   }
 
   // ======= Unidades (modelos por clase) =======
-  const BASE_SPEEDS = { guerrero:2.2, tanque:1.75, picaro:3.05, arquero:2.35, mago:2.1, lancero:2.4 };
-  const NONHEALER_AVG_SPEED = (BASE_SPEEDS.guerrero + BASE_SPEEDS.tanque + BASE_SPEEDS.picaro + BASE_SPEEDS.arquero + BASE_SPEEDS.mago + BASE_SPEEDS.lancero) / 6.0;
+  const BASE_SPEEDS = { guerrero:2.2, tanque:1.75, picaro:3.05, arquero:2.35, mago:2.1, lancero:2.4, alquimista:2.25 };
+  const NONHEALER_AVG_SPEED = (BASE_SPEEDS.guerrero + BASE_SPEEDS.tanque + BASE_SPEEDS.picaro + BASE_SPEEDS.arquero + BASE_SPEEDS.mago + BASE_SPEEDS.lancero + BASE_SPEEDS.alquimista) / 7.0;
 
   function attachShield(leftPivot, size=0.7, color=0x9aa6b2){
     const shield = new THREE.Mesh(
@@ -566,6 +566,9 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
       mesh = new THREE.Mesh(new THREE.CylinderBufferGeometry(0.05, 0.05, 1.7, 10), new THREE.MeshStandardMaterial({ color: (type==="sanador"?0x88ffcc:0xccccff), metalness:.1, roughness:.6 }));
       mesh.position.set(0, -1.05, 0);
       attachOrb(pivot, type==="sanador" ? 0x88ffcc : 0xccccff);
+    } else if (type === "alquimista"){
+      mesh = new THREE.Mesh(new THREE.SphereBufferGeometry(0.14, 10, 10), new THREE.MeshStandardMaterial({ color: 0x88aaee, metalness:.2, roughness:.5 }));
+      mesh.position.set(0, -0.8, 0);
     }
     if (mesh){ mesh.castShadow = true; pivot.add(mesh); }
     return mesh;
@@ -574,7 +577,7 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
   function makeUnit(type, colorHex, teamRef){
     const root = new THREE.Group();
     // Silueta: ancho/alto varía por clase
-    const scaleMap = { guerrero:1.0, tanque:1.15, picaro:0.9, arquero:0.95, mago:0.95, sanador:0.95, lancero:1.0 };
+    const scaleMap = { guerrero:1.0, tanque:1.15, picaro:0.9, arquero:0.95, mago:0.95, sanador:0.95, lancero:1.0, alquimista:0.95 };
     const h = 1.2 * scaleMap[type];
     const body = new THREE.Mesh(new THREE.CylinderBufferGeometry(0.3*scaleMap[type], 0.42*scaleMap[type], h, 16), new THREE.MeshStandardMaterial({ color: colorHex, roughness:.7, metalness:.1 }));
     body.castShadow = true; body.position.y = h*0.5; root.add(body);
@@ -600,6 +603,7 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
     if (type === "arquero"){ attachQuiver(root); }
     if (type === "mago"){ attachCloak(root, 0x3a3f66); }
     if (type === "sanador"){ attachCloak(root, 0x2f5a4a); }
+    if (type === "alquimista"){ attachCloak(root, 0x4b3b2a); }
 
     const weapon = equipWeapon(rightPivot, type);
     const hp = makeHealthBar(); root.add(hp);
@@ -619,7 +623,8 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
       arquero:  { hp:96,  speed:BASE_SPEEDS.arquero,   dmg:[8,15],  range:6.3,  cd:0.9,  projSpeed:11.0, keep:6.2, minKite:3.6 },
       lancero:  { hp:110, speed:BASE_SPEEDS.lancero,   dmg:[9,17],  range:5.0,  cd:1.0,  projSpeed:10.5, keep:5.6, minKite:3.2, slowDur:1.5 },
       mago:     { hp:86,  speed:BASE_SPEEDS.mago,      dmg:[14,24], range:7.1,  cd:1.4,  projSpeed:8.5, splash:1.3, keep:6.6, minKite:3.6 },
-      sanador:  { hp:86,  speed:NONHEALER_AVG_SPEED*0.82, dmg:[0,0], range:1.2,  cd:1.0,  heal:[12,20], healRange:7.0, healCd:1.15, projSpeed:9.0, keep:7.2 }
+      sanador:  { hp:86,  speed:NONHEALER_AVG_SPEED*0.82, dmg:[0,0], range:1.2,  cd:1.0,  heal:[12,20], healRange:7.0, healCd:1.15, projSpeed:9.0, keep:7.2 },
+      alquimista: { hp:90, speed:BASE_SPEEDS.alquimista, dmg:[8,14], range:6.0, potionCd:1.6, projSpeed:9.5, keep:6.0, potions:["veneno","fuego","cura"], heal:[10,16] }
     };
     const stats = statsMap[type];
 
@@ -628,7 +633,7 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
       type, teamRef, color: colorHex,
       speed: stats.speed, health: stats.hp, maxHealth: stats.hp,
       damageMin: stats.dmg ? stats.dmg[0]:0, damageMax: stats.dmg?stats.dmg[1]:0,
-      attackRange: stats.range, attackCooldown: stats.cd,
+      attackRange: stats.range, attackCooldown: stats.potionCd || stats.cd,
       attackT: 0, healT: 0,
       isAttacking: false, attackAnim: 0, hitApplied: false,
       bobT: Math.random()*Math.PI*2, hpNode: hp, rightPivot, leftPivot, rightArm, leftArm, trail, weapon, torch,
@@ -637,6 +642,7 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
       speedFactor: 1, slowT: 0,
       // healer
       healMin: stats.heal?stats.heal[0]:0, healMax: stats.heal?stats.heal[1]:0, healRange: stats.healRange || 0, healCd: stats.healCd || 0,
+      potions: stats.potions || [],
       alive: true, target: null, retargetT: Math.random()*0.5,
       state: "", stateT: 0
     };
@@ -646,7 +652,7 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
 
   // Proyectiles
   const projectiles = [];
-  function spawnProjectile(owner, target, kind){
+  function spawnProjectile(owner, target, kind, subtype=null){
     const obj = new THREE.Group(); let mesh;
     if (kind === "flecha"){
       mesh = new THREE.Mesh(new THREE.CylinderBufferGeometry(0.02, 0.02, 0.7, 6), new THREE.MeshBasicMaterial({ color: 0xffe0a8 }));
@@ -658,11 +664,14 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
       mesh = new THREE.Mesh(new THREE.SphereBufferGeometry(0.16, 12, 12), new THREE.MeshBasicMaterial({ color: 0xff8855 }));
     } else if (kind === "cura"){
       mesh = new THREE.Mesh(new THREE.SphereBufferGeometry(0.18, 12, 12), new THREE.MeshBasicMaterial({ color: 0x88ffcc }));
+    } else if (kind === "pocion"){
+      const colors = { veneno:0x55ff55, fuego:0xff5522, cura:0x88ffcc };
+      mesh = new THREE.Mesh(new THREE.SphereBufferGeometry(0.14, 12, 12), new THREE.MeshBasicMaterial({ color: colors[subtype]||0x88aaee }));
     }
     obj.add(mesh);
     obj.position.copy(owner.position).add(new THREE.Vector3(0,1.2,0));
     scene.add(obj);
-    projectiles.push({ obj, owner, target, kind, speed: owner.userData.projSpeed || 9.0, life: 2.8 });
+    projectiles.push({ obj, owner, target, kind, subtype, speed: owner.userData.projSpeed || 9.0, life: 2.8 });
   }
   function updateProjectiles(dt){
     for (let i=projectiles.length-1;i>=0;--i){
@@ -678,6 +687,16 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
         if (p.kind === "cura"){
           const heal = Math.floor(THREE.MathUtils.lerp(p.owner.userData.healMin, p.owner.userData.healMax, Math.random()));
           applyHeal(p.target, heal, p.obj.position);
+        } else if (p.kind === "pocion"){
+          const base = Math.floor(THREE.MathUtils.lerp(p.owner.userData.damageMin, p.owner.userData.damageMax, Math.random()));
+          if (p.subtype === "cura"){
+            alliesOf(p.owner).forEach(a => { if (a.userData.alive && a.position.distanceTo(p.obj.position) <= 1.6){ const heal = Math.floor(THREE.MathUtils.lerp(p.owner.userData.healMin, p.owner.userData.healMax, Math.random())); applyHeal(a, heal, p.obj.position); } });
+          } else if (p.subtype === "fuego"){
+            enemiesOf(p.owner).forEach(e => { if (e.userData.alive && e.position.distanceTo(p.obj.position) <= 1.6){ applyDamage(e, base, p.obj.position); } });
+            triggerShake(0.18, 0.1);
+          } else {
+            enemiesOf(p.owner).forEach(e => { if (e.userData.alive && e.position.distanceTo(p.obj.position) <= 1.2){ applyDamage(e, Math.floor(base*0.7), p.obj.position); for (let t=1;t<=2;t++){ setTimeout(()=>{ if(e.userData.alive) applyDamage(e, Math.floor(base*0.4), e.position.clone().setY(1.1)); }, t*700); } } });
+          }
         } else {
           const dmg = Math.floor(THREE.MathUtils.lerp(p.owner.userData.damageMin, p.owner.userData.damageMax, Math.random()));
           applyDamage(p.target, dmg, p.obj.position);
@@ -757,10 +776,10 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
       const base = ["guerrero","tanque","picaro","tanque"];
       while (arr.length < size) arr.push(base[arr.length % base.length]);
     } else if (kind === "ranged"){
-      const base = ["arquero","mago","lancero","picaro","arquero"];
+      const base = ["arquero","mago","lancero","alquimista","picaro","arquero"];
       while (arr.length < size) arr.push(base[arr.length % base.length]);
     } else if (kind === "support"){
-      const base = ["tanque","guerrero","sanador","arquero","mago","sanador"];
+      const base = ["tanque","guerrero","sanador","alquimista","arquero","mago","sanador"];
       while (arr.length < size) arr.push(base[arr.length % base.length]);
     } else {
       const base = ["guerrero","tanque","picaro","arquero","lancero","mago","sanador"];
