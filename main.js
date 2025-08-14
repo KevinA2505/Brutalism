@@ -310,10 +310,11 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
     raycaster.setFromCamera(mouse, camera);
     const hit = raycaster.intersectObject(terrain.mesh)[0];
     if (hit){
-      const { x, z, y } = hit.point;
+      const { x, z } = hit.point;
       const team = teams[spawnEdit.teamIdx];
       team.spawn.set(x, 0, z);
-      spawnEdit.marker.position.set(x, y + 0.6, z);
+      if (!simState.active) repositionTeam(team);
+      showSpawnMarker();
     }
   }
   function refreshSpawnMarker(){
@@ -715,6 +716,20 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
       let z = center.z + (row-(rows-1)/2)*2.4 + jitter;
       u.position.set(x, terrain.heightAtWorld(x,z), z);
       scene.add(u); list.push(u); allUnits.push(u);
+    }
+  }
+
+  function repositionTeam(teamRef){
+    const list = teamRef.units;
+    const center = teamRef.spawn.clone();
+    const rows = Math.ceil(list.length / 3);
+    for (let i=0;i<list.length;i++){
+      const u = list[i];
+      const row = Math.floor(i / 3);
+      const col = i % 3;
+      let x = center.x + (col-1)*1.8;
+      let z = center.z + (row-(rows-1)/2)*2.4;
+      u.position.set(x, terrain.heightAtWorld(x, z), z);
     }
   }
 
