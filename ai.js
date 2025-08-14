@@ -19,8 +19,12 @@ export function updateTeamCounts(){
     row.querySelector('.teamName').textContent = t.name;
     const inp = row.querySelector('.team-size');
     inp.value = total;
+    inp.addEventListener('input', setupMatch);
+    inp.addEventListener('change', setupMatch);
     const sel = row.querySelector('.team-comp');
     sel.value = compVal;
+    sel.addEventListener('input', setupMatch);
+    sel.addEventListener('change', setupMatch);
     row.querySelector('.fill').style.width = `${(100*alive/total).toFixed(1)}%`;
     row.querySelector('.team-count').textContent = `${alive}/${total}`;
     box.appendChild(row);

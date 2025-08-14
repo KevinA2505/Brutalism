@@ -361,6 +361,14 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
     setupMatch();
   });
 
+  const handleTeamFieldChange = (e) => {
+    if (e.target.matches('.team-size, .team-comp')) {
+      setupMatch();
+    }
+  };
+  ui.teamsPanel.addEventListener('input', handleTeamFieldChange);
+  ui.teamsPanel.addEventListener('change', handleTeamFieldChange);
+
   ui.teamsPanel.addEventListener('click', (e) => {
     const row = e.target.closest('.teamRow');
     if (!row) return;
