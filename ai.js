@@ -28,7 +28,7 @@ export function updateTeamCounts(){
 }
 
 export function setupMatch(){
-  const { simState, ui, clearUnits, buildTeams, allUnits, updateHPBar } = ctx;
+  const { simState, ui, clearUnits, buildTeams, allUnits, updateHPBar, refreshSpawnMarker } = ctx;
   simState.active = false; simState.paused = false;
   ui.start.disabled = false; ui.pause.disabled = true; ui.pause.textContent = "Pausar"; ui.status.textContent = "Preparado.";
 
@@ -48,9 +48,12 @@ export function setupMatch(){
   }
 
   clearUnits();
-  buildTeams(configs);
+  const newTeams = buildTeams(configs);
+  ctx.teams = newTeams;
+  ctx.allUnits = allUnits;
   allUnits.forEach(updateHPBar);
   updateTeamCounts();
+  refreshSpawnMarker && refreshSpawnMarker();
 }
 
 export function selectTarget(u){
