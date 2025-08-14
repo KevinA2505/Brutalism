@@ -1,6 +1,11 @@
-let ctx;
+let ctx, tmpVec1, tmpVec2;
 
-export function initAI(c){ ctx = c; }
+export function initAI(c){
+  ctx = c;
+  const { THREE } = ctx;
+  tmpVec1 = new THREE.Vector3();
+  tmpVec2 = new THREE.Vector3();
+}
 
 export function updateTeamCounts(){
   const { ui, teams } = ctx;
@@ -115,7 +120,7 @@ export function decideAndMove(u, dt){
     const a = alliesList[i];
     if (a.userData.alive && a.position.distanceTo(u.position) < 4.8) nearbyAllies++;
   }
-  let desire = new THREE.Vector3(0,0,0);
+  const desire = tmpVec1.set(0,0,0);
 
   const outnumbered = (nearbyEnemies - nearbyAllies) >= 2;
   if ((hpRatio < 0.18) || (hpRatio < 0.4 && outnumbered)){
@@ -124,17 +129,17 @@ export function decideAndMove(u, dt){
 
   if (u.userData.state === "flee"){
     if (target){
-      desire.add(u.position.clone().sub(target.position).normalize().multiplyScalar(3.1));
+      desire.add(tmpVec2.copy(u.position).sub(target.position).normalize().multiplyScalar(3.1));
     } else {
       const sign = Math.sign(u.userData.teamRef.units.reduce((s,x)=>s+x.position.x,0) || 1);
-      desire.add(new THREE.Vector3(sign,0,0));
+      desire.add(tmpVec2.set(sign,0,0));
     }
   }
 
   if (target){
     tmpV.copy(target.position).sub(u.position); const dist = tmpV.length(); tmpV.normalize();
     if (blockedLOS(u.position, target.position)){
-      desire.add(new THREE.Vector3(-tmpV.z,0,tmpV.x).multiplyScalar(0.8*(Math.random()<0.5?1:-1)));
+      desire.add(tmpVec2.set(-tmpV.z,0,tmpV.x).multiplyScalar(0.8*(Math.random()<0.5?1:-1)));
     }
     lookAt2D(u, tmpV);
 
@@ -148,9 +153,9 @@ export function decideAndMove(u, dt){
       const keep = u.userData.keep || (supporter?7.0:6.2);
       const err = dist - keep;
       if (Math.abs(err) > 0.4){
-        desire.add(tmpV.clone().multiplyScalar(err>0 ? 0.9 : -1.0));
+        desire.add(tmpVec2.copy(tmpV).multiplyScalar(err>0 ? 0.9 : -1.0));
       }
-      desire.add(new THREE.Vector3(-tmpV.z,0,tmpV.x).multiplyScalar(0.4*(Math.random()<0.5?1:-1)));
+      desire.add(tmpVec2.set(-tmpV.z,0,tmpV.x).multiplyScalar(0.4*(Math.random()<0.5?1:-1)));
     }
 
     if (supporter){
@@ -158,19 +163,19 @@ export function decideAndMove(u, dt){
       const low = lowestAlly(u);
       if (danger){
         const nearest = enemiesOf(u).reduce((a,b)=> (a.position.distanceTo(u.position) < b.position.distanceTo(u.position))?a:b);
-        const away = u.position.clone().sub(nearest.position).normalize();
+        const away = tmpVec2.copy(u.position).sub(nearest.position).normalize();
         desire.add(away.multiplyScalar(1.1));
       }
       if (low && low.ratio < 0.95){
         const ally = low.ally; const d = ally.position.distanceTo(u.position);
         if (d <= u.userData.healRange && u.userData.healT <= 0){ spawnProjectile(u, ally, "cura"); u.userData.healT = u.userData.healCd; }
-        else { desire.add(ally.position.clone().sub(u.position).normalize().multiplyScalar(0.6)); }
+        else { desire.add(tmpVec2.copy(ally.position).sub(u.position).normalize().multiplyScalar(0.6)); }
       }
     }
 
     if (!ranged && !supporter && u.userData.state !== "flee"){
       const flankBias = (u.userData.type==="picaro") ? 0.9 : 0.35;
-      const flank = new THREE.Vector3(-tmpV.z,0,tmpV.x).multiplyScalar(flankBias*(Math.random()<0.5?1:-1));
+      const flank = tmpVec2.set(-tmpV.z,0,tmpV.x).multiplyScalar(flankBias*(Math.random()<0.5?1:-1));
       if (!inRangeMelee) desire.add(tmpV).add(flank);
     }
 
@@ -189,15 +194,15 @@ export function decideAndMove(u, dt){
         u.userData.hitApplied = true;
         let dmg = Math.floor(THREE.MathUtils.lerp(u.userData.damageMin, u.userData.damageMax, Math.random()));
         if (u.userData.type === "tanque" && u.userData.aoe){
-          enemiesOf(u).forEach(e => { if (e.userData.alive && e.position.distanceTo(target.position) <= u.userData.aoe + 0.3){ applyDamage(e, dmg, e.position.clone().setY(1.1)); } });
+          enemiesOf(u).forEach(e => { if (e.userData.alive && e.position.distanceTo(target.position) <= u.userData.aoe + 0.3){ applyDamage(e, dmg, tmpVec2.copy(e.position).setY(1.1)); } });
           triggerShake(0.22, 0.12);
         } else {
           if (u.userData.type === "picaro"){
-            const forward = new THREE.Vector3(Math.sin(target.rotation.y), 0, Math.cos(target.rotation.y));
-            const toAtt = u.position.clone().sub(target.position).normalize();
+            const forward = tmpVec2.set(Math.sin(target.rotation.y), 0, Math.cos(target.rotation.y));
+            const toAtt = tmpV.copy(u.position).sub(target.position).normalize();
             if (forward.dot(toAtt) > 0.5) dmg = Math.floor(dmg * u.userData.critBack);
           }
-          applyDamage(target, dmg, target.position.clone().setY(1.1)); triggerShake(0.16, 0.08);
+          applyDamage(target, dmg, tmpVec2.copy(target.position).setY(1.1)); triggerShake(0.16, 0.08);
         }
       }
       if (tt >= 1){ u.userData.isAttacking = false; u.userData.trail.material.opacity = 0; u.userData.rightPivot.rotation.set(0,0,0); }
@@ -220,7 +225,7 @@ export function decideAndMove(u, dt){
 
   const r = Math.hypot(u.position.x, u.position.z);
   if (r > ARENA_R-1.0){
-    const pull = (r - (ARENA_R-1.0)); u.position.addScaledVector(u.position.clone().multiplyScalar(-1/r), pull*0.7);
+    const pull = (r - (ARENA_R-1.0)); u.position.addScaledVector(tmpVec2.copy(u.position).multiplyScalar(-1/r), pull*0.7);
     ground(u);
   }
 }
