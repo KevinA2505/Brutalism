@@ -328,6 +328,8 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
 
   // ======= UI =======
   const ui = {
+    root: document.getElementById('ui'),
+    toggle: document.getElementById('toggleUi'),
     status: document.getElementById('statusTxt'),
     start:  document.getElementById('startBtn'),
     pause:  document.getElementById('pauseBtn'),
@@ -346,6 +348,15 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
     rough: document.getElementById('rough'),
     mtn: document.getElementById('mtn'),
   };
+  function collapseUI(){
+    ui.root.classList.add('ui-collapsed');
+    ui.toggle.style.display = 'block';
+  }
+  function expandUI(){
+    ui.root.classList.remove('ui-collapsed');
+    ui.toggle.style.display = 'none';
+  }
+  ui.toggle.addEventListener('click', expandUI);
   ui.speed.addEventListener('input', () => { simState.speedMul = parseFloat(ui.speed.value); ui.speedLbl.textContent = simState.speedMul.toFixed(2) + "x"; });
   ui.satellite.addEventListener('change', () => { controls.satellite = ui.satellite.checked; });
   controls.satellite = ui.satellite.checked;
@@ -403,6 +414,7 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
     allUnits.forEach(u => { u.userData.attackT = 0; u.userData.healT = 0; u.userData.isAttacking = false; u.userData.state=""; u.userData.stateT=0; });
     ui.start.disabled = true; ui.pause.disabled = false;
     ui.status.textContent = "¡Batalla en curso!"; log("¡La batalla ha comenzado!");
+    collapseUI();
   });
   ui.pause.addEventListener('click', () => { if (!simState.active) return; simState.paused = !simState.paused; ui.pause.textContent = simState.paused ? "Reanudar" : "Pausar"; ui.status.textContent = simState.paused ? "Batalla pausada" : "¡Batalla en curso!"; });
   ui.reset.addEventListener('click', setupMatch);
@@ -678,6 +690,7 @@ const { camera, controls } = initCamera(renderer, canvas, simState);
       simState.active = false; ui.start.disabled = false; ui.pause.disabled = true;
       const winner = aliveTeams[0];
       ui.status.textContent = winner ? `¡Gana ${winner.name}!` : "Empate";
+      expandUI();
     }
   }
 
